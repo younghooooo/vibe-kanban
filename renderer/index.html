@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdn.jsdelivr.net; connect-src 'self';">
+<title>Kanban</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Fraunces:ital,wght@0,400;0,500;0,600;1,400;1,500&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable.min.css" />
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: {
+      extend: {
+        fontFamily: {
+          sans: ['Pretendard Variable', 'Pretendard', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'ui-sans-serif', 'sans-serif'],
+          serif: ['Fraunces', 'ui-serif', 'Georgia'],
+          mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
+        },
+      }
+    }
+  };
+</script>
+<link rel="stylesheet" href="styles.css">
+<script>
+  (function () {
+    try {
+      var theme = localStorage.getItem('vk:theme');
+      if (!theme) {
+        theme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      if (theme === 'dark') document.documentElement.classList.add('dark');
+      else document.documentElement.classList.remove('dark');
+
+      var sidebar = localStorage.getItem('vk:sidebar') || 'open';
+      document.documentElement.setAttribute('data-sidebar', sidebar);
+    } catch (e) {
+      // localStorage 접근 실패 시 기본값
+      document.documentElement.setAttribute('data-sidebar', 'open');
+    }
+  })();
+</script>
+</head>
+<body class="font-sans antialiased" data-sidebar="open">
+
+<div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+<!-- ============ HEADER ============ -->
+<header class="header-drag sticky top-0 z-30">
+  <div class="header-left no-drag">
+    <button id="sidebar-toggle" type="button" class="btn btn-icon" aria-label="Toggle sidebar">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <line x1="3" y1="6" x2="21" y2="6"></line>
+        <line x1="3" y1="12" x2="21" y2="12"></line>
+        <line x1="3" y1="18" x2="21" y2="18"></line>
+      </svg>
+    </button>
+  </div>
+  <div class="header-right no-drag">
+    <button id="theme-toggle" type="button" class="btn btn-icon" aria-label="Toggle theme">
+      <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4"></circle>
+        <path d="M12 2v2"></path>
+        <path d="M12 20v2"></path>
+        <path d="m4.93 4.93 1.41 1.41"></path>
+        <path d="m17.66 17.66 1.41 1.41"></path>
+        <path d="M2 12h2"></path>
+        <path d="M20 12h2"></path>
+        <path d="m6.34 17.66-1.41 1.41"></path>
+        <path d="m19.07 4.93-1.41 1.41"></path>
+      </svg>
+      <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+      </svg>
+    </button>
+    <div class="dropdown" id="moreMenu">
+      <button class="btn btn-icon" id="moreMenuBtn" aria-label="More" aria-haspopup="true" aria-expanded="false">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="5" r="1.5"></circle>
+          <circle cx="12" cy="12" r="1.5"></circle>
+          <circle cx="12" cy="19" r="1.5"></circle>
+        </svg>
+      </button>
+      <ul class="dropdown-content">
+        <li><a onclick="backupJson()">JSON 백업</a></li>
+        <li><a onclick="openExports()">내보내기 폴더</a></li>
+      </ul>
+    </div>
+  </div>
+</header>
+
+<!-- ============ APP ============ -->
+<div class="app-shell">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+      <!-- Categories -->
+      <section class="mb-8">
+        <div class="cat-header flex items-center justify-between mb-3">
+          <span class="section-title">카테고리</span>
+          <div class="cat-header-actions">
+            <button type="button" class="btn-link" onclick="promptCreateFolder()">+ 폴더</button>
+            <button type="button" class="btn-link" onclick="openCategoryEditor()">+ 편집</button>
+          </div>
+        </div>
+        <ul class="space-y-1" id="catList"></ul>
+      </section>
+
+      <div class="sidebar-nav-extras">
+        <button type="button" class="sidebar-stats-btn" onclick="showStats()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+          토큰 통계
+        </button>
+      </div>
+    </div>
+
+    <div class="sidebar-model">
+      <span class="section-title">모델</span>
+      <select id="modelSelect" class="select select-sm w-full font-mono text-xs">
+        <option value="claude-opus-4-7">Claude Opus 4.7</option>
+        <option value="claude-opus-4-5">Claude Opus 4.5</option>
+        <option value="claude-sonnet-4-6">Claude Sonnet 4.6</option>
+        <option value="claude-sonnet-4-5" selected>Claude Sonnet 4.5</option>
+        <option value="claude-haiku-4-5">Claude Haiku 4.5</option>
+      </select>
+    </div>
+
+    <div class="sidebar-footer">
+      <button type="button" id="authChip" class="auth-chip" onclick="openAuthModal()">
+        <span class="auth-dot" id="authDot"></span>
+        <span class="auth-label" id="authLabel">확인 중…</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <!-- 보드 뷰 -->
+    <div id="boardView" class="board-view">
+      <div class="flex items-center justify-between mb-6 gap-4">
+        <div>
+          <h1 class="text-3xl lg:text-4xl font-semibold leading-tight" id="boardTitle"></h1>
+          <div class="text-sm opacity-60 mt-1" id="boardMeta"></div>
+        </div>
+        <div class="flex items-center gap-2">
+          <div id="boardRunningSummary" class="board-running-summary" hidden>
+            <span class="spinner is-small"></span>
+            실행 중 <span id="boardRunningCount">0</span>개
+          </div>
+          <button onclick="openNewCard()" class="btn btn-sm btn-primary border-0 font-semibold gap-1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            새 작업
+          </button>
+        </div>
+      </div>
+
+      <!-- FILTER TOOLBAR -->
+      <div class="filter-toolbar" id="filterToolbar">
+        <div class="card-search-wrap" id="cardSearchWrap">
+          <input
+            type="text"
+            id="cardSearchInput"
+            class="input card-search-input"
+            placeholder="카드 검색 (제목/설명)"
+            autocomplete="off"
+          />
+          <button type="button" id="cardSearchClear" class="card-search-clear" hidden aria-label="검색어 지우기">&#xD7;</button>
+        </div>
+        <div class="label-filter-bar" id="labelFilterBar" hidden></div>
+      </div>
+
+      <!-- COLUMNS -->
+      <div class="columns-grid" id="columns">
+        <div class="column-wrap" data-status="todo">
+          <div class="flex items-center justify-between mb-3 px-1">
+            <div class="flex items-center gap-2">
+              <span class="h-1.5 w-1.5 rounded-full opacity-40 bg-current"></span>
+              <h2 class="text-xs font-semibold uppercase tracking-wider opacity-60">할 일</h2>
+            </div>
+            <span class="text-xs font-mono opacity-40" id="cnt-todo">0</span>
+          </div>
+          <div class="column-body" id="col-todo"></div>
+        </div>
+        <div class="column-wrap" data-status="doing">
+          <div class="flex items-center justify-between mb-3 px-1">
+            <div class="flex items-center gap-2">
+              <span class="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+              <h2 class="text-xs font-semibold uppercase tracking-wider text-cyan-400">진행 중</h2>
+            </div>
+            <span class="text-xs font-mono opacity-40" id="cnt-doing">0</span>
+          </div>
+          <div class="column-body" id="col-doing"></div>
+        </div>
+        <div class="column-wrap" data-status="review">
+          <div class="flex items-center justify-between mb-3 px-1">
+            <div class="flex items-center gap-2">
+              <span class="h-1.5 w-1.5 rounded-full bg-indigo-400"></span>
+              <h2 class="text-xs font-semibold uppercase tracking-wider text-indigo-400">검토</h2>
+            </div>
+            <span class="text-xs font-mono opacity-40" id="cnt-review">0</span>
+          </div>
+          <div class="column-body" id="col-review"></div>
+        </div>
+        <div class="column-wrap" data-status="done">
+          <div class="flex items-center justify-between mb-3 px-1">
+            <div class="flex items-center gap-2">
+              <span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+              <h2 class="text-xs font-semibold uppercase tracking-wider text-emerald-400">완료</h2>
+            </div>
+            <span class="text-xs font-mono opacity-40" id="cnt-done">0</span>
+          </div>
+          <div class="column-body" id="col-done"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 통계 뷰 -->
+    <div id="statsView" class="stats-view" hidden></div>
+
+    <!-- 상세 페이지 뷰 -->
+    <div id="detailView" class="detail-view" hidden>
+      <div class="detail-topbar">
+        <button type="button" id="detailBack" class="btn btn-ghost detail-back-btn" aria-label="Back to board">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          <span>보드</span>
+        </button>
+        <span id="detailRunningIndicator" class="detail-running-indicator" hidden>
+          <span class="spinner is-small"></span>
+          <span>실행 중</span>
+          <span id="detailRunningElapsed"></span>
+        </span>
+        <div class="detail-topbar-actions">
+          <button type="button" id="detailExport" class="btn btn-ghost" hidden>.md 저장</button>
+          <button type="button" id="detailDelete" class="btn btn-ghost btn-danger">삭제</button>
+        </div>
+      </div>
+
+      <div class="detail-body">
+        <input type="text" id="d-title" class="detail-title input-title" placeholder="제목 없음" autocomplete="off" />
+
+        <div class="detail-meta">
+          <div class="meta-row">
+            <span class="meta-label">카테고리</span>
+            <select id="d-category" class="select-inline"></select>
+          </div>
+          <div class="meta-row">
+            <span class="meta-label">우선순위</span>
+            <select id="d-priority" class="select-inline">
+              <option value="low">낮음</option>
+              <option value="med" selected>보통</option>
+              <option value="high">높음</option>
+            </select>
+          </div>
+          <div class="meta-row">
+            <span class="meta-label">상태</span>
+            <select id="d-status" class="select-inline">
+              <option value="todo">할 일</option>
+              <option value="doing">진행 중</option>
+              <option value="review">리뷰</option>
+              <option value="done">완료</option>
+            </select>
+          </div>
+          <div class="meta-row">
+            <span class="meta-label">라벨</span>
+            <div class="meta-value">
+              <span id="d-label-dot" class="label-dot" hidden></span>
+              <select id="d-label" class="select-inline">
+                <option value="">없음</option>
+                <!-- options 동적 채움 -->
+              </select>
+              <button type="button" id="d-label-manage" class="btn-link" title="라벨 관리">관리</button>
+            </div>
+          </div>
+          <div class="meta-row">
+            <span class="meta-label">모델</span>
+            <select id="d-model" class="select-inline">
+              <option value="">기본 모델</option>
+              <!-- 옵션은 app.js에서 sidebar modelSelect와 동기화 -->
+            </select>
+          </div>
+          <div class="meta-row">
+            <span class="meta-label">작업 경로</span>
+            <div class="meta-value meta-cwd">
+              <span id="d-cwd-display" class="meta-cwd-text">기본 경로 사용</span>
+              <button type="button" id="d-cwd-pick" class="btn btn-ghost btn-sm">변경</button>
+              <button type="button" id="d-cwd-clear" class="btn btn-ghost btn-sm">초기화</button>
+            </div>
+          </div>
+          <div class="meta-row">
+            <span class="meta-label">자동 진행</span>
+            <div class="meta-value">
+              <label class="toggle-switch">
+                <input type="checkbox" id="d-autoRun" />
+                <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                <span class="toggle-text" id="d-autoRun-label">확인 받으며 진행</span>
+              </label>
+            </div>
+          </div>
+          <div class="meta-row" style="align-items:flex-start; padding-top:6px;">
+            <span class="meta-label" style="padding-top:2px;">스킬 사용</span>
+            <div class="meta-value" style="display:flex; flex-direction:column; gap:3px;">
+              <label class="toggle-switch">
+                <input type="checkbox" id="d-useSkills" />
+                <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                <span class="toggle-text" id="d-useSkills-label">기본 모드</span>
+              </label>
+              <span class="meta-hint">체크 시 /plan, /brainstorming 같은 Agmo 스킬 사용 가능 (~5-10k 토큰 추가)</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <div class="section-header-row">
+            <span class="section-label">AI 명령</span>
+          </div>
+          <textarea id="d-desc" class="prompt-textarea" rows="6" placeholder="예) 다음 주 프로젝트 회의록을 정리해줘. 참석자, 주요 안건, 결정사항, 액션 아이템을 포함해서." autocomplete="off"></textarea>
+          <div class="detail-run-bar">
+            <button type="button" id="detailRun" class="btn btn-primary">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>
+              <span>AI로 실행</span>
+            </button>
+            <button type="button" id="detailTerminal" class="btn btn-ghost">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+              <span>터미널 열기</span>
+            </button>
+            <button type="button" id="detailEditor" class="btn btn-ghost" title="에디터에서 열기 (Cursor / VSCode)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="16 18 22 12 16 6"></polyline>
+                <polyline points="8 6 2 12 8 18"></polyline>
+              </svg>
+              <span>에디터 열기</span>
+            </button>
+            <button type="button" id="detailCompact" class="btn btn-ghost" title="/compact — 세션 대화 요약">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 14 10 14 10 20"></polyline><polyline points="20 10 14 10 14 4"></polyline><line x1="14" y1="10" x2="21" y2="3"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+              <span>대화 압축</span>
+            </button>
+            <button type="button" id="detailResetSession" class="btn btn-ghost" title="이 카드의 대화 세션을 초기화합니다">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+              <span>새 대화</span>
+            </button>
+            <span class="detail-session-hint" id="detailSessionHint" hidden></span>
+            <span class="detail-run-meta" id="d-tokens"></span>
+          </div>
+          <div id="compactProgress" class="compact-progress" hidden>
+            <div class="compact-progress-bar"><div class="compact-progress-fill"></div></div>
+            <span class="compact-progress-text" id="compactProgressText">대화 압축 중…</span>
+          </div>
+        </div>
+
+        <div class="detail-section pending-section" id="pendingSection" hidden>
+          <div class="section-header-row">
+            <span class="section-label pending-label">
+              <span class="pending-pulse"></span>
+              컨펌 필요
+            </span>
+            <span class="section-meta" id="pendingSummary"></span>
+          </div>
+          <div class="pending-body">
+            <div class="pending-meta" id="pendingMeta"></div>
+            <div class="diff-view" id="pendingDiff"></div>
+            <div class="pending-actions">
+              <button type="button" id="pendingReject" class="btn btn-ghost btn-danger">거부</button>
+              <button type="button" id="pendingApprove" class="btn btn-primary">승인</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="detail-section" id="d-logSection">
+          <div class="section-header-row">
+            <span class="section-label">실행 결과</span>
+          </div>
+          <div id="d-logBox" class="log-box">아직 실행되지 않았습니다.</div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ============ AUTH MODAL ============ -->
+<dialog class="modal" id="authModal">
+  <div class="modal-box max-w-2xl border shadow-2xl p-0">
+    <header class="flex items-center justify-between px-6 py-4 border-b">
+      <div>
+        <h3 class="text-xl font-semibold">인증 설정</h3>
+        <p class="text-xs opacity-60 mt-0.5">AI를 실행하려면 두 방식 중 하나를 선택하세요</p>
+      </div>
+      <button onclick="closeAuthModal()" class="btn btn-ghost btn-sm btn-icon">✕</button>
+    </header>
+
+    <div class="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+      <!-- Claude CLI -->
+      <div class="rounded-xl border overflow-hidden">
+        <div class="flex items-start justify-between p-5">
+          <div class="flex items-start gap-3">
+            <div class="h-10 w-10 rounded-lg border flex items-center justify-center flex-shrink-0">
+              <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            </div>
+            <div>
+              <h4 class="font-semibold text-base">Claude Code 구독 사용</h4>
+              <p class="text-sm opacity-60 mt-0.5">Pro/Max 구독이 있으면 추가 비용 없음</p>
+            </div>
+          </div>
+          <span class="badge badge-sm" id="cliBadge">확인 중</span>
+        </div>
+        <div class="px-5 pb-5 space-y-3">
+          <div class="rounded-lg border px-4 py-3 text-sm" id="cliStep">CLI 감지 중...</div>
+          <div class="flex flex-wrap gap-2">
+            <button onclick="recheckCLI()" class="btn btn-sm btn-ghost">↻ 다시 감지</button>
+            <button onclick="openClaudeInstall()" class="btn btn-sm btn-ghost">설치 가이드 →</button>
+            <button id="useCliBtn" onclick="selectAuthMode('cli')" class="btn btn-sm btn-primary border-0 font-semibold ml-auto" disabled>
+              이 방식 사용
+            </button>
+          </div>
+          <details class="text-xs">
+            <summary class="cursor-pointer opacity-60 hover:opacity-100">작동 원리 보기</summary>
+            <ol class="mt-3 space-y-1.5 opacity-70 pl-4 list-decimal">
+              <li><code class="border px-1.5 py-0.5 rounded font-mono">npm i -g @anthropic-ai/claude-code</code></li>
+              <li>터미널에서 <code class="border px-1.5 py-0.5 rounded font-mono">claude</code> 실행 → 브라우저 로그인</li>
+              <li>이 앱에서 "다시 감지" 클릭</li>
+              <li>RUN 누르면 내부적으로 CLI 호출 → 본인 구독 사용</li>
+            </ol>
+          </details>
+        </div>
+      </div>
+
+      <!-- API Key -->
+      <div class="rounded-xl border overflow-hidden">
+        <div class="flex items-start justify-between p-5">
+          <div class="flex items-start gap-3">
+            <div class="h-10 w-10 rounded-lg border flex items-center justify-center flex-shrink-0">
+              <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-1 6h2v2h-2V7zm0 4h2v6h-2v-6z"/></svg>
+            </div>
+            <div>
+              <h4 class="font-semibold text-base">API 키 직접 입력</h4>
+              <p class="text-sm opacity-60 mt-0.5">사용량만큼 과금. 구독 없어도 OK</p>
+            </div>
+          </div>
+          <span class="badge badge-sm" id="apiBadge">미설정</span>
+        </div>
+        <div class="px-5 pb-5 space-y-3">
+          <input type="password" id="apiKeyInput"
+            class="input w-full font-mono text-sm"
+            placeholder="sk-ant-..."
+            autocomplete="new-password" />
+          <p class="text-[11px] opacity-50">OS 키체인에 암호화되어 저장됩니다.</p>
+          <div class="flex flex-wrap gap-2">
+            <button onclick="openApiKeys()" class="btn btn-sm btn-ghost">키 발급 →</button>
+            <button id="clearKeyBtn" onclick="clearApiKey()" class="btn btn-sm btn-ghost text-red-500 hidden">키 삭제</button>
+            <button id="useApiBtn" onclick="selectAuthMode('api')" class="btn btn-sm btn-primary border-0 font-semibold ml-auto" disabled>
+              이 방식 사용
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Auto -->
+      <div class="rounded-xl border p-5">
+        <div class="flex items-start justify-between gap-4">
+          <div class="flex items-start gap-3">
+            <div class="h-10 w-10 rounded-lg border flex items-center justify-center flex-shrink-0">
+              <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+            </div>
+            <div>
+              <h4 class="font-semibold text-base">자동 모드</h4>
+              <p class="text-sm opacity-60 mt-0.5">CLI 먼저 시도, 실패 시 API로 자동 전환</p>
+            </div>
+          </div>
+          <button onclick="selectAuthMode('auto')" class="btn btn-sm btn-primary border-0 font-semibold">선택</button>
+        </div>
+      </div>
+
+      <div class="text-center text-xs opacity-50 pt-2" id="authCurrent"></div>
+    </div>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
+<!-- ============ CATEGORY EDITOR MODAL ============ -->
+<dialog class="modal category-modal" id="categoryModal">
+  <div class="modal-box category-modal-box">
+    <button type="button" class="btn btn-icon category-close-float" onclick="closeCategoryModal()" aria-label="Close">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+    </button>
+
+    <div class="category-modal-body">
+      <div class="category-root-dropzone" id="catRootDropzone" aria-label="루트로 이동">
+        폴더 밖으로 이동 (최상위)
+      </div>
+      <ul id="catEditList" class="category-list"></ul>
+      <div class="category-add-row">
+        <input type="text" id="newCatName" class="input-inline" placeholder="새 카테고리 추가" autocomplete="off" maxlength="12" />
+      </div>
+    </div>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
+<!-- ============ LABEL MANAGER MODAL ============ -->
+<dialog class="modal label-modal" id="labelModal">
+  <div class="modal-box label-modal-box">
+    <button type="button" class="btn btn-icon label-close-float" onclick="closeLabelModal()" aria-label="Close">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+    </button>
+    <div class="label-modal-body">
+      <ul id="labelList" class="label-list"></ul>
+      <div class="label-add-row">
+        <input type="text" id="newLabelName" class="input-inline" placeholder="새 라벨 이름" autocomplete="off" />
+        <button type="button" id="newLabelPick" class="btn btn-ghost btn-sm">경로 선택</button>
+        <button type="button" id="newLabelAdd" class="btn btn-primary btn-sm">추가</button>
+      </div>
+    </div>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
+<!-- ============ TOASTS ============ -->
+<div class="toast z-50" id="toasts"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
