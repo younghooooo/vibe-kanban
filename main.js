@@ -40,6 +40,9 @@ function createWindow() {
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
   if (isDev) mainWindow.webContents.openDevTools();
   mainWindow.on('closed', () => { mainWindow = null; });
+  mainWindow.webContents.on('found-in-page', (_e, result) => {
+    mainWindow.webContents.send('findInPage:result', result);
+  });
 }
 
 app.whenReady().then(createWindow);
@@ -87,7 +90,7 @@ function getApiKey() {
   }
   return s.apiKeyPlain || null;
 }
-ipcMain.handle('settings:get-model', async () => readSettings().model || 'claude-sonnet-4-5');
+ipcMain.handle('settings:get-model', async () => readSettings().model || 'claude-sonnet-4-6');
 ipcMain.handle('settings:set-model', async (_e, model) => {
   const s = readSettings(); s.model = model; writeSettings(s); return { ok: true };
 });
@@ -284,7 +287,7 @@ function sanitizeCliLine(line) {
 }
 
 async function runViaClaudeCLI(prompt, model, cardId, options = {}) {
-  const { autoRun = false, cwd, skipPermissions = false, sessionId = null, systemPrompt = null, useSkills = false } = options;
+  const { autoRun = false, cwd, refPaths = [], skipPermissions = false, sessionId = null, systemPrompt = null, useSkills = false } = options;
   const cli = detectClaudeCLI();
   if (!cli.found) return { ok: false, error: 'Claude CLI not found', fallback: true };
 
@@ -299,10 +302,9 @@ async function runViaClaudeCLI(prompt, model, cardId, options = {}) {
     if (model) {
       const cliModel = {
         'claude-opus-4-7': 'claude-opus-4-7',
-        'claude-opus-4-5': 'opus',
-        'claude-sonnet-4-5': 'sonnet',
+        'claude-sonnet-4-6': 'claude-sonnet-4-6',
         'claude-haiku-4-5': 'haiku',
-      }[model] || 'sonnet';
+      }[model] || 'claude-sonnet-4-6';
       args.push('--model', cliModel);
     }
     // Use dangerously-skip-permissions when autoRun is enabled or user explicitly approved.
@@ -314,6 +316,12 @@ async function runViaClaudeCLI(prompt, model, cardId, options = {}) {
     // Append system prompt as array arg to avoid shell escaping issues
     if (systemPrompt) {
       args.push('--append-system-prompt', systemPrompt);
+    }
+    // Additional reference directories
+    if (Array.isArray(refPaths)) {
+      for (const p of refPaths) {
+        if (p && typeof p === 'string') args.push('--add-dir', p);
+      }
     }
 
     const spawnOpts = { stdio: ['pipe','pipe','pipe'], env: { ...process.env } };
@@ -488,13 +496,13 @@ async function runViaAPI(prompt, model, maxTokens, images = []) {
   });
 }
 
-ipcMain.handle('ai:run', async (_e, { model, prompt, systemPrompt, maxTokens, cardId, autoRun, useSkills, cwd, skipPermissions, sessionId, images }) => {
+ipcMain.handle('ai:run', async (_e, { model, prompt, systemPrompt, maxTokens, cardId, autoRun, useSkills, cwd, refPaths, skipPermissions, sessionId, images }) => {
   const authMode = readSettings().authMode || 'auto';
   if (authMode === 'api') return await runViaAPI(prompt, model, maxTokens, images);
-  if (authMode === 'cli') return await runViaClaudeCLI(prompt, model, cardId, { autoRun, useSkills, cwd, skipPermissions, sessionId, images, systemPrompt });
+  if (authMode === 'cli') return await runViaClaudeCLI(prompt, model, cardId, { autoRun, useSkills, cwd, refPaths, skipPermissions, sessionId, images, systemPrompt });
 
   // auto
-  const cliResult = await runViaClaudeCLI(prompt, model, cardId, { autoRun, useSkills, cwd, skipPermissions, sessionId, images, systemPrompt });
+  const cliResult = await runViaClaudeCLI(prompt, model, cardId, { autoRun, useSkills, cwd, refPaths, skipPermissions, sessionId, images, systemPrompt });
   if (cliResult.ok) return cliResult;
   if (cliResult.fallback && getApiKey()) {
     const apiResult = await runViaAPI(prompt, model, maxTokens, images);
@@ -565,6 +573,15 @@ ipcMain.handle('export:backup-json', async () => {
   } catch (err) { return { ok: false, error: err.message }; }
 });
 ipcMain.handle('app:open-external', async (_e, url) => { shell.openExternal(url); return { ok: true }; });
+
+ipcMain.handle('findInPage:find', (_e, text, options) => {
+  if (!mainWindow) return;
+  if (text) mainWindow.webContents.findInPage(text, options || {});
+  else mainWindow.webContents.stopFindInPage('clearSelection');
+});
+ipcMain.handle('findInPage:stop', (_e, action) => {
+  if (mainWindow) mainWindow.webContents.stopFindInPage(action || 'clearSelection');
+});
 
 ipcMain.handle('dialog:pickDirectory', async (event, defaultPath) => {
   const win = BrowserWindow.getFocusedWindow();
@@ -646,8 +663,8 @@ ipcMain.handle('claude:compact', async (_e, cardId, sessionId, cwd, useSkills) =
 
   // When useSkills=true, omit --setting-sources to allow Agmo plugins during compact.
   const args = useSkills
-    ? ['-p', '--output-format', 'json', '--resume', sessionId]
-    : ['-p', '--output-format', 'json', '--resume', sessionId, '--setting-sources', 'project,local'];
+    ? ['-p', '--output-format', 'json', '--resume', sessionId, '--dangerously-skip-permissions']
+    : ['-p', '--output-format', 'json', '--resume', sessionId, '--setting-sources', 'project,local', '--dangerously-skip-permissions'];
   const spawnOpts = { stdio: ['pipe','pipe','pipe'], env: { ...process.env } };
   if (cwd) spawnOpts.cwd = cwd;
 
@@ -655,20 +672,30 @@ ipcMain.handle('claude:compact', async (_e, cardId, sessionId, cwd, useSkills) =
     console.log(`[claude-cli] useSkills=${!!useSkills}, compact spawn args:`, cli.path, args.join(' '));
     const proc = spawn(cli.path, args, spawnOpts);
     let stdout = '', stderr = '';
+    let resolved = false;
+    const safeResolve = (val) => { if (!resolved) { resolved = true; resolve(val); } };
+
+    // 2분 타임아웃 — compact가 권한 대기 등으로 무한 정지하는 것을 방지
+    const timeout = setTimeout(() => {
+      try { proc.kill('SIGTERM'); } catch (e) {}
+      safeResolve({ ok: false, error: 'compact timeout (2min)' });
+    }, 2 * 60 * 1000);
+    proc.on('exit', () => clearTimeout(timeout));
+
     proc.stdout.on('data', d => stdout += d.toString('utf8'));
     proc.stderr.on('data', d => stderr += d.toString('utf8'));
-    proc.on('error', err => resolve({ ok: false, error: String(err) }));
+    proc.on('error', err => safeResolve({ ok: false, error: String(err) }));
     proc.on('close', (code) => {
       if (code !== 0) {
-        return resolve({ ok: false, error: `CLI exit ${code}: ${stderr.slice(0, 200)}` });
+        return safeResolve({ ok: false, error: `CLI exit ${code}: ${stderr.slice(0, 200)}` });
       }
       try {
         const parsed = JSON.parse(stdout);
         const summary = typeof parsed.result === 'string' ? parsed.result.trim() : '';
-        if (!summary) return resolve({ ok: false, error: '빈 응답' });
-        return resolve({ ok: true, summary });
+        if (!summary) return safeResolve({ ok: false, error: '빈 응답' });
+        return safeResolve({ ok: true, summary });
       } catch (e) {
-        return resolve({ ok: false, error: 'JSON parse: ' + e.message });
+        return safeResolve({ ok: false, error: 'JSON parse: ' + e.message });
       }
     });
     proc.stdin.write(compactPrompt);

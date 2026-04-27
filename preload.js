@@ -32,4 +32,7 @@ contextBridge.exposeInMainWorld('api', {
   onAiLog: (cb) => ipcRenderer.on('ai:log', (_e, payload) => cb(payload)),
   onAiDone: (cb) => ipcRenderer.on('ai:done', (_e, payload) => cb(payload)),
   onAiSession: (cb) => ipcRenderer.on('ai:session', (_e, payload) => cb(payload)),
+  findInPage: (text, opts) => ipcRenderer.invoke('findInPage:find', text, opts),
+  stopFindInPage: (action) => ipcRenderer.invoke('findInPage:stop', action),
+  onFindResult: (cb) => ipcRenderer.on('findInPage:result', (_e, result) => cb(result)),
 });
