@@ -122,9 +122,7 @@
       <span class="section-title">모델</span>
       <select id="modelSelect" class="select select-sm w-full font-mono text-xs">
         <option value="claude-opus-4-7">Claude Opus 4.7</option>
-        <option value="claude-opus-4-5">Claude Opus 4.5</option>
-        <option value="claude-sonnet-4-6">Claude Sonnet 4.6</option>
-        <option value="claude-sonnet-4-5" selected>Claude Sonnet 4.5</option>
+        <option value="claude-sonnet-4-6" selected>Claude Sonnet 4.6</option>
         <option value="claude-haiku-4-5">Claude Haiku 4.5</option>
       </select>
     </div>
@@ -236,6 +234,10 @@
           <span id="detailRunningElapsed"></span>
         </span>
         <div class="detail-topbar-actions">
+          <button type="button" id="detailWidthToggle" class="btn btn-ghost detail-width-toggle" aria-label="너비 전환" title="넓게 보기">
+            <svg class="icon-expand" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+            <svg class="icon-compress" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 10 14 10 20"></polyline><polyline points="20 10 14 10 14 4"></polyline><line x1="14" y1="10" x2="21" y2="3"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+          </button>
           <button type="button" id="detailExport" class="btn btn-ghost" hidden>.md 저장</button>
           <button type="button" id="detailDelete" class="btn btn-ghost btn-danger">삭제</button>
         </div>
@@ -249,13 +251,23 @@
             <span class="meta-label">카테고리</span>
             <select id="d-category" class="select-inline"></select>
           </div>
+          <div class="meta-row meta-row-wrap">
+            <span class="meta-label">작업 종류</span>
+            <div class="chip-group" id="d-taskType-group">
+              <button type="button" class="chip-btn" data-value="">미분류</button>
+              <button type="button" class="chip-btn" data-value="feature">기능</button>
+              <button type="button" class="chip-btn" data-value="uiux">UI/UX</button>
+              <button type="button" class="chip-btn" data-value="refactor">리팩토링</button>
+              <button type="button" class="chip-btn" data-value="bug">버그</button>
+            </div>
+          </div>
           <div class="meta-row">
             <span class="meta-label">우선순위</span>
-            <select id="d-priority" class="select-inline">
-              <option value="low">낮음</option>
-              <option value="med" selected>보통</option>
-              <option value="high">높음</option>
-            </select>
+            <div class="chip-group" id="d-priority-group">
+              <button type="button" class="chip-btn chip-prio-low" data-value="low">낮음</button>
+              <button type="button" class="chip-btn chip-prio-med" data-value="med">보통</button>
+              <button type="button" class="chip-btn chip-prio-high" data-value="high">높음</button>
+            </div>
           </div>
           <div class="meta-row">
             <span class="meta-label">상태</span>
@@ -277,12 +289,11 @@
               <button type="button" id="d-label-manage" class="btn-link" title="라벨 관리">관리</button>
             </div>
           </div>
-          <div class="meta-row">
+          <div class="meta-row meta-row-wrap">
             <span class="meta-label">모델</span>
-            <select id="d-model" class="select-inline">
-              <option value="">기본 모델</option>
-              <!-- 옵션은 app.js에서 sidebar modelSelect와 동기화 -->
-            </select>
+            <div class="chip-group" id="d-model-group">
+              <!-- 동적 생성 -->
+            </div>
           </div>
           <div class="meta-row">
             <span class="meta-label">작업 경로</span>
@@ -290,6 +301,13 @@
               <span id="d-cwd-display" class="meta-cwd-text">기본 경로 사용</span>
               <button type="button" id="d-cwd-pick" class="btn btn-ghost btn-sm">변경</button>
               <button type="button" id="d-cwd-clear" class="btn btn-ghost btn-sm">초기화</button>
+            </div>
+          </div>
+          <div class="meta-row" style="align-items:flex-start; padding-top:4px;">
+            <span class="meta-label" style="padding-top:4px;">참조 경로</span>
+            <div class="meta-value" style="display:flex; flex-direction:column; gap:4px; min-width:0;">
+              <div id="d-refPaths-list" class="ref-paths-list"></div>
+              <button type="button" id="d-refPath-add" class="btn btn-ghost btn-sm ref-path-add-btn">+ 경로 추가</button>
             </div>
           </div>
           <div class="meta-row">
@@ -522,6 +540,51 @@
 <!-- ============ TOASTS ============ -->
 <div class="toast z-50" id="toasts"></div>
 
-<script src="app.js"></script>
+<!-- ============ FIND BAR (CMD+F) ============ -->
+<div id="findBar" class="find-bar" hidden>
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="find-bar-icon" aria-hidden="true">
+    <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+  </svg>
+  <input type="text" id="findInput" class="find-input" placeholder="페이지에서 찾기..." autocomplete="off" spellcheck="false" />
+  <span id="findCount" class="find-count"></span>
+  <button id="findPrev" class="find-nav-btn" aria-label="이전">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>
+  </button>
+  <button id="findNext" class="find-nav-btn" aria-label="다음">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+  </button>
+  <button id="findClose" class="find-close-btn" aria-label="닫기">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+  </button>
+</div>
+
+<!-- ============ GLOBAL SEARCH ============ -->
+<div id="globalSearchOverlay" class="global-search-overlay" hidden>
+  <div class="global-search-box" role="dialog" aria-label="글로벌 검색">
+    <div class="global-search-header">
+      <svg class="global-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="8"></circle>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+      <input
+        type="text"
+        id="globalSearchInput"
+        class="global-search-input"
+        placeholder="카드 검색..."
+        autocomplete="off"
+        spellcheck="false"
+      />
+      <kbd class="global-search-esc">ESC</kbd>
+    </div>
+    <div id="globalSearchResults" class="global-search-results"></div>
+    <div class="global-search-footer">
+      <span><kbd>↑</kbd><kbd>↓</kbd> 이동</span>
+      <span><kbd>↵</kbd> 열기</span>
+      <span><kbd>⌘K</kbd> 닫기</span>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="app.js"></script>
 </body>
 </html>
