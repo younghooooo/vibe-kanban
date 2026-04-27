@@ -3,6 +3,16 @@
 AI 칸반 보드. Claude API로 카드 작업을 실행합니다.
 **Claude Code 구독이 있으면 추가 비용 없이** 사용 가능.
 
+## v0.3.1 업데이트
+
+렌더러 구조 개편, 카드 상세 UX 개선, 전역 검색 추가 등 기능과 안정성이 전반적으로 향상되었다.
+
+- **렌더러 아키텍처 재구성 (Feature Slice Design)**: 단일 `renderer/app.js` 모놀리스를 `app/`, `shared/`, `entities/`, `features/`, `widgets/` 5계층으로 분리. 레이어 간 단방향 import 규칙 적용 — 자세한 내용은 `CLAUDE.md` 참조
+- **카드 상세 UX 개편**: 작업 종류(기능/UI·UX/리팩토링/버그) 칩 분류 추가, 우선순위·모델 선택을 칩 그룹으로 변경, 참조 경로 다중 추가(Claude CLI `--add-dir` 전달), 카드 상세 너비 토글(넓게 보기) 버튼
+- **전역 검색 (⌘K)**: 카드 제목·설명·라벨을 가로질러 즉시 탐색
+- **모델 기본값 갱신**: Claude Sonnet 4.6으로 변경, 사이드바 모델 선택 옵션 정리 (Opus 4.7 / Sonnet 4.6 / Haiku 4.5)
+- **안정성 개선**: `claude:compact` 호출에 2분 타임아웃 + `--dangerously-skip-permissions` 적용으로 무한 정지 방지
+
 ## v0.3 변경점
 
 - **디자인 전면 리뉴얼**: Tailwind + DaisyUI 기반, 정보 위계/가독성 대폭 개선
