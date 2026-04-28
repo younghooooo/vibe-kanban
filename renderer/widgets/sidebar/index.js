@@ -2,7 +2,8 @@
 import { state, persist } from '../../app/state.js';
 import { escapeHtml } from '../../shared/lib/utils.js';
 import { toast } from '../../shared/ui/toast.js';
-import { currentCategoryId, addCategory, deleteCategory, startRenameCategory } from '../../entities/category/index.js';
+import { currentCategoryId, addCategory, deleteCategory, startRenameCategory, addRepoToCategory, removeRepoFromCategory } from '../../entities/category/index.js';
+import { getPAT, setPAT } from '../../shared/lib/github-pat.js';
 import {
   getFolder, getCategoriesByFolder, getAllCategoriesOrdered, getCategoriesInTreeOrder,
   deleteFolder, renameFolder, createFolder, toggleFolderCollapse, promptCreateFolder,
@@ -240,15 +241,34 @@ export function renderCategoryEditor() {
     const count = state.cards.filter(c => c.category === cat.id).length;
     const disabledAttr = state.categories.length <= 1 ? 'disabled title="최소 1개는 남아야 해요"' : 'title="삭제"';
 
+    const repos = (cat.repos || []);
+    const repoCount = repos.length;
     return `
       <li class="category-row" data-cat-id="${cat.id}" draggable="true">
         <span class="category-name" data-rename="${cat.id}" tabindex="0" role="button">${escapeHtml(cat.name)}</span>
         <span class="category-meta">
           ${count > 0 ? `<span class="category-count item-action">${count}개</span>` : ''}
+          <button class="btn btn-icon btn-sm item-action" data-repo-toggle="${cat.id}" title="GitHub repo 관리" aria-label="GitHub repos">
+            <span style="font-size:10px; font-family:monospace;">GH${repoCount ? `·${repoCount}` : ''}</span>
+          </button>
           <button class="btn btn-icon btn-sm category-delete item-action" data-del="${cat.id}" ${disabledAttr} aria-label="Delete">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
           </button>
         </span>
+      </li>
+      <li class="category-repo-panel" data-repo-panel="${cat.id}" hidden style="padding:6px 12px 12px; background:rgba(0,0,0,0.04); border-radius:6px; margin:0 0 4px 24px; list-style:none;">
+        <div data-repo-list="${cat.id}" style="display:flex; flex-direction:column; gap:4px; margin-bottom:6px;">
+          ${repos.map(r => `
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; font-size:12px; font-family:monospace;">
+              <span>${escapeHtml(r.owner)}/${escapeHtml(r.repo)}</span>
+              <button class="btn btn-icon btn-sm" data-repo-remove="${cat.id}" data-owner="${escapeHtml(r.owner)}" data-repo="${escapeHtml(r.repo)}" aria-label="Remove" style="opacity:0.6;">✕</button>
+            </div>
+          `).join('') || '<span style="font-size:11px; opacity:0.5;">연결된 repo 없음</span>'}
+        </div>
+        <div style="display:flex; gap:4px;">
+          <input type="text" class="input-inline" data-repo-input="${cat.id}" placeholder="owner/repo" autocomplete="off" style="flex:1; font-family:monospace; font-size:12px;" />
+          <button type="button" class="btn btn-sm" data-repo-add="${cat.id}">추가</button>
+        </div>
       </li>`;
   }).join('');
 
@@ -273,6 +293,70 @@ export function renderCategoryEditor() {
       deleteCategory(id);
     });
   });
+
+  // Repo panel toggle
+  list.querySelectorAll('button[data-repo-toggle]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const id = btn.getAttribute('data-repo-toggle');
+      const panel = list.querySelector(`[data-repo-panel="${id}"]`);
+      if (panel) panel.hidden = !panel.hidden;
+    });
+  });
+
+  // Repo add
+  list.querySelectorAll('button[data-repo-add]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.getAttribute('data-repo-add');
+      const input = list.querySelector(`input[data-repo-input="${id}"]`);
+      if (!input) return;
+      const raw = input.value.trim();
+      const m = raw.match(/^([^\/\s]+)\/([^\/\s]+)$/);
+      if (!m) {
+        toast('owner/repo 형식으로 입력하세요', 'error');
+        return;
+      }
+      const ok = addRepoToCategory(id, m[1], m[2]);
+      if (!ok) {
+        toast('이미 추가된 repo입니다', 'error');
+        return;
+      }
+      input.value = '';
+      renderCategoryEditor();
+      // re-open the panel after re-render
+      const panel = document.querySelector(`#catEditList [data-repo-panel="${id}"]`);
+      if (panel) panel.hidden = false;
+      toast(`${m[1]}/${m[2]} 추가됨`, 'success');
+    });
+  });
+
+  // Repo remove
+  list.querySelectorAll('button[data-repo-remove]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.getAttribute('data-repo-remove');
+      const owner = btn.getAttribute('data-owner');
+      const repo = btn.getAttribute('data-repo');
+      removeRepoFromCategory(id, owner, repo);
+      renderCategoryEditor();
+      const panel = document.querySelector(`#catEditList [data-repo-panel="${id}"]`);
+      if (panel) panel.hidden = false;
+    });
+  });
+
+  // PAT input wiring (once per render)
+  const patInput = document.getElementById('ghPatInput');
+  if (patInput && !patInput.dataset.bound) {
+    patInput.dataset.bound = '1';
+    const cur = getPAT();
+    if (cur) patInput.placeholder = '••••' + cur.slice(-4);
+    patInput.addEventListener('change', () => {
+      setPAT(patInput.value);
+      patInput.value = '';
+      const updated = getPAT();
+      patInput.placeholder = updated ? '••••' + updated.slice(-4) : 'ghp_...';
+      toast(updated ? 'PAT 저장됨' : 'PAT 제거됨', 'success');
+    });
+  }
 
   // Drag-and-drop for category rows
   list.querySelectorAll('.category-row').forEach(row => {

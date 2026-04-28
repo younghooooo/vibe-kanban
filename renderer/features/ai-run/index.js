@@ -33,7 +33,7 @@ export function ensureCardTitle(card) {
   if (typeof window.renderDetail === 'function' && state.detailCardId === card.id) window.renderDetail();
 }
 
-export function buildSystemPrompt(card) {
+export function buildSystemPrompt(card, docPath) {
   const cat = state.categories.find(c => c.id === card.category);
   const cardPaths = Array.isArray(card.refPaths) ? card.refPaths.filter(Boolean) : [];
   const label = card.labelId ? state.labels.find(l => l.id === card.labelId) : null;
@@ -41,11 +41,22 @@ export function buildSystemPrompt(card) {
   const refSection = allRefPaths.length > 0
     ? `\n[추가 참조 경로]\n${allRefPaths.map(p => `- ${p}`).join('\n')}\n`
     : '';
+  const docSection = docPath ? `
+[작업 문서]
+이 카드의 작업 문서(Markdown)는 다음 경로에 있습니다:
+${docPath}
+
+규칙:
+- 작업을 시작하기 전에 반드시 Read 도구로 이 파일을 읽어 계획·맥락·진척을 파악하세요.
+- 작업 도중 새 결정·진척·중요 정보가 생기면 Edit 또는 Write 도구로 이 파일을 갱신하세요.
+- 체크박스(- [ ] / - [x]) 토글, 섹션 추가, 결정 기록 등 카드의 \"살아있는 문서\"로 다루세요.
+- 문서 전체를 함부로 비우지 말고 기존 구조와 의도를 보존하세요.
+` : '';
   return `당신은 개인 작업 보조 AI입니다. 아래 작업을 수행해주세요.
 
 [카테고리] ${cat ? cat.name : '-'}
 [작업 제목] ${card.title}
-${refSection}
+${refSection}${docSection}
 한국어로 깔끔하게 답변하세요. 불필요한 서론 없이 바로 본론으로.`;
 }
 
@@ -175,6 +186,17 @@ export async function runCard(card, opts = {}) {
   }
   if (card.running) return;
 
+  // Capture prompt before clearing — also gate empty input early
+  const promptText = (card.desc || '').trim();
+  if (!promptText && !opts.skipPermissions) { if (typeof alert === 'function') alert('명령을 입력해주세요.'); return; }
+
+  // Push USER log entry FIRST so the user sees their message even before auto-compact
+  card.log = card.log || [];
+  card.log.push({ type: 'user', time: nowHMS(), text: promptText });
+  // Reflect immediately in UI
+  if (state.view === 'detail' && state.detailCardId === card.id && typeof window.renderDetail === 'function') window.renderDetail();
+  if (typeof window.renderColumns === 'function') window.renderColumns();
+
   // Auto-compact: trigger before running if turn count or idle time exceeds threshold.
   // Skip when: no sessionId (fresh session), already compacting, or retry path.
   if (card.sessionId && !opts._retriedWithoutSession) {
@@ -193,14 +215,6 @@ export async function runCard(card, opts = {}) {
       }
     }
   }
-
-  // Capture prompt before clearing
-  const promptText = (card.desc || '').trim();
-  if (!promptText && !opts.skipPermissions) { if (typeof alert === 'function') alert('명령을 입력해주세요.'); return; }
-
-  // Push USER log entry so the prompt appears in the log
-  card.log = card.log || [];
-  card.log.push({ type: 'user', time: nowHMS(), text: promptText });
 
   // Clear textarea immediately so the user can type the next prompt
   card.desc = '';
@@ -266,7 +280,22 @@ export async function runCard(card, opts = {}) {
   if (!card.sessionId && card.summary && card.summary.trim()) {
     effectivePrompt = `[이전 대화 요약]\n${card.summary}\n\n---\n\n${promptText}`;
   }
-  const systemPrompt = buildSystemPrompt(card);
+
+  // Doc sync — write current doc to disk before run, capture pre-hash
+  let docPath = null;
+  let docPreHash = null;
+  let docPreContent = card.doc || '';
+  try {
+    const wr = await window.api.docWrite(card.id, card.cwd || '', docPreContent);
+    if (wr && wr.ok) {
+      docPath = wr.path;
+      docPreHash = wr.hash;
+    }
+  } catch (e) {
+    console.warn('doc:write failed', e);
+  }
+
+  const systemPrompt = buildSystemPrompt(card, docPath);
   const userPrompt = buildUserPrompt(card, effectivePrompt);
   let result;
   try {
@@ -324,6 +353,32 @@ export async function runCard(card, opts = {}) {
   const viaLabel = result.via === 'claude-cli' ? 'Claude CLI' : 'API';
   const fallbackNote = result.fallbackFrom ? ` (fallback from ${result.fallbackFrom})` : '';
   pushLog(c, 'USAGE', `via=${viaLabel}${fallbackNote} · in=${usage.input_tokens} · out=${usage.output_tokens} · $${cost.toFixed(5)}`);
+
+  // Doc sync — read back; if AI modified it, apply + history + log
+  if (docPath) {
+    try {
+      const rd = await window.api.docRead(c.id, c.cwd || '');
+      if (rd && rd.ok && rd.exists && rd.hash && rd.hash !== docPreHash) {
+        const before = docPreContent;
+        const after = rd.content || '';
+        c.docHistory = Array.isArray(c.docHistory) ? c.docHistory : [];
+        c.docHistory.push({ ts: Date.now(), by: 'pre-ai', snapshot: before });
+        if (c.docHistory.length > 20) c.docHistory.splice(0, c.docHistory.length - 20);
+        c.doc = after;
+        c.docUpdatedAt = Date.now();
+        c.docUpdatedBy = 'ai';
+
+        const beforeLines = before.split('\n');
+        const afterLines = after.split('\n');
+        const added = Math.max(0, afterLines.length - beforeLines.length);
+        const removed = Math.max(0, beforeLines.length - afterLines.length);
+        const stat = `+${added}/-${removed} 줄 (총 ${afterLines.length}줄)`;
+        c.log.push({ type: 'doc-update', time: nowHMS(), text: `AI가 본문을 갱신했습니다 — ${stat}` });
+      }
+    } catch (e) {
+      console.warn('doc:read failed', e);
+    }
+  }
 
   state.totals.tokens += totalTok;
   state.totals.runs += 1;

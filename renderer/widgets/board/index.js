@@ -4,6 +4,7 @@ import { escapeHtml, truncate } from '../../shared/lib/utils.js';
 import { getLabelColor } from '../../shared/config/index.js';
 import { getLabel, currentLabelFilter, setCurrentLabelFilter } from '../../entities/label/index.js';
 import { currentCategoryId, currentSearchQuery, setCurrentSearchQuery, filteredCards } from '../../entities/category/index.js';
+import { pushCardChange } from '../../features/github-sync/index.js';
 
 export function renderCard(card) {
   const cat = state.categories.find(c => c.id === card.category);
@@ -28,6 +29,18 @@ export function renderCard(card) {
     labelBadgeHtml = `<span class="card-label-badge" style="${style}"><span class="card-label-dot" style="background-color:${c.fg};--dot-dark:${c.fgDark}"></span>${escapeHtml(label.name)}</span>`;
   }
 
+  // GitHub badge
+  let githubBadgeHtml = '';
+  if (card.github) {
+    const gh = card.github;
+    const stateClass = gh.state === 'closed' ? 'gh-badge-closed' : 'gh-badge-open';
+    githubBadgeHtml = `<span class="card-gh-badge ${stateClass}" style="font-size:10px; font-family:monospace; padding:1px 6px; border-radius:4px; background:rgba(0,0,0,0.06); margin-left:4px;">
+      <a href="${escapeHtml(gh.htmlUrl || '')}" target="_blank" onclick="event.stopPropagation()" style="color:inherit; text-decoration:none;">#${gh.issueNumber}</a>
+      · ${escapeHtml(gh.owner)}/${escapeHtml(gh.repo)}
+      · ${escapeHtml(gh.state || '')}
+    </span>`;
+  }
+
   // Latest log preview for running cards
   const logPreviewHtml = card.running && Array.isArray(card.log) && card.log.length
     ? `<div class="card-running-preview">
@@ -45,6 +58,7 @@ export function renderCard(card) {
         <span class="card-tag tag">${escapeHtml(catName)}</span>
         ${taskTypeBadgeHtml}
         ${labelBadgeHtml}
+        ${githubBadgeHtml}
       </div>
       <div class="card-title">${escapeHtml(card.title)}</div>
       ${card.desc ? `<div class="card-desc">${escapeHtml(card.desc)}</div>` : ''}
@@ -147,6 +161,7 @@ export function initBoardEvents() {
         updateColumn(oldStatus);
         updateColumn(newStatus);
         persist(); // fire and forget — UI already updated
+        pushCardChange(card, { prevStatus: oldStatus });
       }
     });
   });

@@ -1,7 +1,45 @@
 // entities/card/index.js
+import { state } from '../../app/state.js';
 
 export function uid() { return 'c_' + Math.random().toString(36).slice(2, 9); }
 export function catUid() { return 'cat_' + Math.random().toString(36).slice(2, 7); }
+
+export function findCardByIssue(owner, repo, issueNumber) {
+  return state.cards.find(c =>
+    c.github &&
+    c.github.owner === owner &&
+    c.github.repo === repo &&
+    c.github.issueNumber === issueNumber
+  ) || null;
+}
+
+export function buildCardFromIssue(issue, owner, repo, categoryId) {
+  const closed = issue.state === 'closed';
+  return {
+    id: uid(),
+    title: issue.title,
+    desc: issue.body || '',
+    doc: '',
+    docUpdatedAt: 0,
+    docUpdatedBy: 'user',
+    docHistory: [],
+    category: categoryId,
+    priority: 'med',
+    status: closed ? 'done' : 'todo',
+    progress: closed ? 100 : 0,
+    tokens: 0,
+    log: [],
+    createdAt: Date.now(),
+    github: {
+      issueNumber: issue.number,
+      owner,
+      repo,
+      state: issue.state,
+      htmlUrl: issue.html_url,
+      updatedAt: issue.updated_at,
+    },
+  };
+}
 
 export function sampleCards() {
   return [

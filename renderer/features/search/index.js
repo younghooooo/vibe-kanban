@@ -37,7 +37,8 @@ export function _renderGlobalSearchResults(query) {
   if (q) {
     cards = cards.filter(c =>
       (c.title || '').toLowerCase().includes(q) ||
-      (c.desc || '').toLowerCase().includes(q)
+      (c.desc || '').toLowerCase().includes(q) ||
+      (c.doc || '').toLowerCase().includes(q)
     );
   }
 

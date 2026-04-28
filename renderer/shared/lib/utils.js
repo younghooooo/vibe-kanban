@@ -147,9 +147,8 @@ export function renderLogEntries(log) {
     }
   }
 
-  const reversed = log.slice().reverse();  // copy then reverse — newest first
-  return reversed.map((entry, reversedIdx) => {
-    const originalIdx = log.length - 1 - reversedIdx;
+  // Chronological — newest at bottom
+  return log.map((entry, originalIdx) => {
     if (skipIndices.has(originalIdx)) return '';
     let type = 'info', time = '', text = '';
     if (typeof entry === 'string') {
@@ -180,8 +179,10 @@ export function renderLogEntries(log) {
       // base64 encode payload for safe attribute storage
       const payloadB64 = btoa(unescape(encodeURIComponent(JSON.stringify({ filePath, before, after }))));
       return `<div class="log-entry log-entry-diff" data-diff="${payloadB64}">
-        <span class="log-badge log-badge-diff">DIFF</span>
-        ${time ? `<span class="log-time">${escapeHtml(time)}</span>` : ''}
+        <div class="log-entry-head">
+          <span class="log-badge log-badge-diff">DIFF</span>
+          ${time ? `<span class="log-time">${escapeHtml(time)}</span>` : ''}
+        </div>
         <div class="log-diff-body">
           <div class="log-diff-path">
             ${escapeHtml(filePath)}
@@ -206,16 +207,20 @@ export function renderLogEntries(log) {
     // RESULT and STREAM entries render inline with markdown content as a flex item
     if (type === 'result' || type === 'stream') {
       return `<div class="log-entry log-entry-${type}">
-        <span class="${badgeClass}">${badgeLabel}</span>
-        ${time ? `<span class="log-time">${escapeHtml(time)}</span>` : ''}
+        <div class="log-entry-head">
+          <span class="${badgeClass}">${badgeLabel}</span>
+          ${time ? `<span class="log-time">${escapeHtml(time)}</span>` : ''}
+        </div>
         <div class="log-text log-markdown">${renderMarkdown(text)}</div>
       </div>`;
     }
-    // All other types stay as plain inline text
+    // All other types stay as plain text
     return `<div class="log-entry log-entry-${type}">
-      <span class="${badgeClass}">${badgeLabel}</span>
-      ${time ? `<span class="log-time">${escapeHtml(time)}</span>` : ''}
-      <span class="log-text">${escapeHtml(text)}</span>
+      <div class="log-entry-head">
+        <span class="${badgeClass}">${badgeLabel}</span>
+        ${time ? `<span class="log-time">${escapeHtml(time)}</span>` : ''}
+      </div>
+      <div class="log-text">${escapeHtml(text)}</div>
     </div>`;
   }).filter(Boolean).join('');
 }

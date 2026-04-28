@@ -2,13 +2,15 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8" />
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdn.jsdelivr.net; connect-src 'self';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com https://esm.sh; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://esm.sh; connect-src 'self' https://esm.sh;">
 <title>Kanban</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Fraunces:ital,wght@0,400;0,500;0,600;1,400;1,500&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
 <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable.min.css" />
+<link rel="stylesheet" id="hljs-theme-light" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/styles/github.min.css" />
+<link rel="stylesheet" id="hljs-theme-dark"  href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/styles/github-dark.min.css" media="(prefers-color-scheme: dark)" />
 <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
 <script>
   tailwind.config = {
@@ -103,6 +105,7 @@
         <div class="cat-header flex items-center justify-between mb-3">
           <span class="section-title">카테고리</span>
           <div class="cat-header-actions">
+            <button type="button" class="btn-link" id="ghSyncBtn" onclick="syncAllGitHub()" title="GitHub 동기화">↻ GH</button>
             <button type="button" class="btn-link" onclick="promptCreateFolder()">+ 폴더</button>
             <button type="button" class="btn-link" onclick="openCategoryEditor()">+ 편집</button>
           </div>
@@ -244,9 +247,14 @@
       </div>
 
       <div class="detail-body">
+        <div class="detail-main-pane">
         <input type="text" id="d-title" class="detail-title input-title" placeholder="제목 없음" autocomplete="off" />
 
-        <div class="detail-meta">
+        <button type="button" id="detailMetaToggle" class="detail-meta-toggle" aria-expanded="true" aria-controls="detailMeta">
+          <svg class="meta-twistie" width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="8 6 16 12 8 18"></polygon></svg>
+          <span>카테고리 · 모델 · 경로 · 옵션</span>
+        </button>
+        <div class="detail-meta" id="detailMeta">
           <div class="meta-row">
             <span class="meta-label">카테고리</span>
             <select id="d-category" class="select-inline"></select>
@@ -333,42 +341,15 @@
           </div>
         </div>
 
-        <div class="detail-section">
-          <div class="section-header-row">
-            <span class="section-label">AI 명령</span>
+        <div class="detail-section doc-section" id="d-docSection">
+          <div class="doc-toolbar-floating">
+            <button type="button" id="d-docMode" class="doc-mini-btn" data-mode="edit" title="MD 원본 / 에디터 전환">
+              <span class="doc-mini-icon">&lt;&gt;</span>
+              <span class="doc-mini-label">md</span>
+            </button>
           </div>
-          <textarea id="d-desc" class="prompt-textarea" rows="6" placeholder="예) 다음 주 프로젝트 회의록을 정리해줘. 참석자, 주요 안건, 결정사항, 액션 아이템을 포함해서." autocomplete="off"></textarea>
-          <div class="detail-run-bar">
-            <button type="button" id="detailRun" class="btn btn-primary">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>
-              <span>AI로 실행</span>
-            </button>
-            <button type="button" id="detailTerminal" class="btn btn-ghost">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
-              <span>터미널 열기</span>
-            </button>
-            <button type="button" id="detailEditor" class="btn btn-ghost" title="에디터에서 열기 (Cursor / VSCode)">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <polyline points="16 18 22 12 16 6"></polyline>
-                <polyline points="8 6 2 12 8 18"></polyline>
-              </svg>
-              <span>에디터 열기</span>
-            </button>
-            <button type="button" id="detailCompact" class="btn btn-ghost" title="/compact — 세션 대화 요약">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 14 10 14 10 20"></polyline><polyline points="20 10 14 10 14 4"></polyline><line x1="14" y1="10" x2="21" y2="3"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
-              <span>대화 압축</span>
-            </button>
-            <button type="button" id="detailResetSession" class="btn btn-ghost" title="이 카드의 대화 세션을 초기화합니다">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
-              <span>새 대화</span>
-            </button>
-            <span class="detail-session-hint" id="detailSessionHint" hidden></span>
-            <span class="detail-run-meta" id="d-tokens"></span>
-          </div>
-          <div id="compactProgress" class="compact-progress" hidden>
-            <div class="compact-progress-bar"><div class="compact-progress-fill"></div></div>
-            <span class="compact-progress-text" id="compactProgressText">대화 압축 중…</span>
-          </div>
+          <div id="d-doc" class="doc-editor"></div>
+          <div id="d-docRaw" class="doc-raw" contenteditable="plaintext-only" spellcheck="false" data-placeholder="# Markdown 원본" hidden></div>
         </div>
 
         <div class="detail-section pending-section" id="pendingSection" hidden>
@@ -389,12 +370,55 @@
           </div>
         </div>
 
-        <div class="detail-section" id="d-logSection">
-          <div class="section-header-row">
-            <span class="section-label">실행 결과</span>
+        </div><!-- /.detail-main-pane -->
+
+        <div class="detail-splitter" id="detailSplitter" role="separator" aria-orientation="vertical" tabindex="0" aria-label="대화창 너비 조절"></div>
+
+        <aside class="detail-side-pane">
+          <div class="detail-section" id="d-logSection">
+            <div class="section-header-row log-toolbar">
+              <label class="detail-debug-toggle" title="INFO·USAGE·START·AUTO-COMPACT 표시 토글">
+                <input type="checkbox" id="detailDebugToggle" />
+                <span class="debug-track"><span class="debug-thumb"></span></span>
+                <span class="debug-label">Debug</span>
+              </label>
+            </div>
+            <div id="d-logBox" class="log-box">아직 실행되지 않았습니다.</div>
           </div>
-          <div id="d-logBox" class="log-box">아직 실행되지 않았습니다.</div>
-        </div>
+
+          <div class="detail-section detail-input-section">
+            <div class="prompt-row">
+              <textarea id="d-desc" class="prompt-textarea" rows="3" placeholder="메시지를 입력하세요..." autocomplete="off"></textarea>
+              <button type="button" id="detailRun" class="btn btn-primary prompt-send-btn" title="전송 (Enter)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>
+                <span>전송</span>
+              </button>
+            </div>
+            <div class="detail-run-bar">
+              <button type="button" id="detailTerminal" class="btn btn-ghost" title="터미널 열기">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+              </button>
+              <button type="button" id="detailEditor" class="btn btn-ghost" title="에디터에서 열기 (Cursor / VSCode)">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="16 18 22 12 16 6"></polyline>
+                  <polyline points="8 6 2 12 8 18"></polyline>
+                </svg>
+              </button>
+              <button type="button" id="detailCompact" class="btn btn-ghost" title="/compact — 세션 대화 요약">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 14 10 14 10 20"></polyline><polyline points="20 10 14 10 14 4"></polyline><line x1="14" y1="10" x2="21" y2="3"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+              </button>
+              <button type="button" id="detailResetSession" class="btn btn-ghost" title="이 카드의 대화 세션을 초기화합니다">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+              </button>
+              <span class="detail-session-hint" id="detailSessionHint" hidden></span>
+              <span class="detail-run-meta" id="d-tokens"></span>
+            </div>
+            <div id="compactProgress" class="compact-progress" hidden>
+              <div class="compact-progress-bar"><div class="compact-progress-fill"></div></div>
+              <span class="compact-progress-text" id="compactProgressText">대화 압축 중…</span>
+            </div>
+          </div>
+        </aside>
       </div>
     </div>
   </main>
@@ -514,6 +538,14 @@
       <div class="category-add-row">
         <input type="text" id="newCatName" class="input-inline" placeholder="새 카테고리 추가" autocomplete="off" maxlength="12" />
       </div>
+      <details class="github-settings" id="githubSettings" style="margin-top:12px;">
+        <summary style="cursor:pointer; user-select:none; padding:6px 0; font-size:12px; opacity:0.75;">GitHub 설정</summary>
+        <div style="padding:8px 0; display:flex; flex-direction:column; gap:6px;">
+          <label style="font-size:11px; opacity:0.6;">Personal Access Token (scope: repo)</label>
+          <input type="password" id="ghPatInput" class="input-inline" placeholder="ghp_..." autocomplete="off" />
+          <a href="https://github.com/settings/tokens" target="_blank" style="font-size:11px; opacity:0.6;">토큰 생성하기 →</a>
+        </div>
+      </details>
     </div>
   </div>
   <form method="dialog" class="modal-backdrop"><button>close</button></form>
@@ -585,6 +617,20 @@
   </div>
 </div>
 
+<script type="importmap">
+{
+  "imports": {
+    "@tiptap/core":                    "https://esm.sh/@tiptap/core@2",
+    "@tiptap/starter-kit":             "https://esm.sh/@tiptap/starter-kit@2",
+    "@tiptap/extension-task-list":     "https://esm.sh/@tiptap/extension-task-list@2",
+    "@tiptap/extension-task-item":     "https://esm.sh/@tiptap/extension-task-item@2",
+    "@tiptap/extension-placeholder":   "https://esm.sh/@tiptap/extension-placeholder@2",
+    "@tiptap/extension-code-block-lowlight": "https://esm.sh/@tiptap/extension-code-block-lowlight@2",
+    "lowlight":                        "https://esm.sh/lowlight@3",
+    "tiptap-markdown":                 "https://esm.sh/tiptap-markdown@0"
+  }
+}
+</script>
 <script type="module" src="app.js"></script>
 </body>
 </html>
