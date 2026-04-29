@@ -695,6 +695,7 @@ input, textarea, select, button {
   gap: 5px;
   flex-wrap: wrap;
   margin-bottom: 6px;
+  padding-right: 24px;
 }
 .card-tag {
   display: inline-block;
@@ -867,7 +868,7 @@ html.dark .task-type-bug      { color: #f87171; background-color: rgba(248, 113,
 }
 
 .col-clear-btn {
-  display: none;
+  display: flex;
   align-items: center;
   justify-content: center;
   width: 24px;
@@ -884,7 +885,6 @@ html.dark .task-type-bug      { color: #f87171; background-color: rgba(248, 113,
 }
 .col-clear-btn svg { width: 15px; height: 15px; }
 .col-clear-btn:hover { opacity: 1; color: var(--danger); }
-.column-wrap:hover .col-clear-btn { display: flex; }
 
 .add-card-btn {
   width: 100%;
@@ -4005,6 +4005,76 @@ html.dark .global-search-status-done { color: #4ade80; }
   background: var(--surface);
   font-family: inherit;
   margin-right: 2px;
+}
+
+/* ============ RECENT CARDS MODAL ============ */
+.recent-cards-box {
+  max-width: 520px;
+}
+
+.recent-cards-header {
+  padding: 12px 16px;
+}
+
+.recent-cards-title {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.recent-cards-list {
+  max-height: 460px;
+}
+
+.recent-cards-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 16px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 80ms;
+}
+
+.recent-cards-item:hover,
+.recent-cards-item.is-active {
+  background: var(--surface-hover);
+}
+
+.recent-cards-item-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.recent-cards-item-title {
+  font-size: 14px;
+  color: var(--text);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recent-cards-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 3px;
+}
+
+.recent-cards-item-time {
+  font-size: 12px;
+  color: var(--text-faint);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.recent-cards-empty {
+  text-align: center;
+  color: var(--text-faint);
+  font-size: 13px;
+  padding: 24px 16px;
 }
 
 /* ============ CHIP GROUP (작업종류·우선순위·모델 선택) ============ */

@@ -50,6 +50,7 @@ import {
   runCard, runCurrent, quickRun,
 } from '../features/ai-run/index.js';
 import { exportCurrentMd, openExports, backupJson, resetAll, openExternal } from '../features/export/index.js';
+import { openRecentCards, closeRecentCards, initRecentCards } from '../features/recent-cards/index.js';
 import {
   syncAll as syncAllGitHub,
   syncCurrentCategory,
@@ -111,6 +112,8 @@ Object.assign(window, {
   startElapsedTicker,
   // 검색
   openGlobalSearch, closeGlobalSearch,
+  // 최근 카드
+  openRecentCards, closeRecentCards,
   // 단축키 설정 패널
   toggleShortcutsPanel, toggleGrayscale,
   // GitHub
@@ -192,6 +195,7 @@ window.__mockPending = function(cardId) {
   try { initDetailView(); } catch (e) { console.error('initDetailView failed', e); }
   try { initCardSearch(); } catch (e) { console.error('initCardSearch failed', e); }
   try { initGlobalSearch(); } catch (e) { console.error('initGlobalSearch failed', e); }
+  try { initRecentCards(); } catch (e) { console.error('initRecentCards failed', e); }
   try { initBoardEvents(); } catch (e) { console.error('initBoardEvents failed', e); }
 
   const savedModel = await window.api.getModel();

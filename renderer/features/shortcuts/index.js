@@ -3,15 +3,17 @@ import { _safeGet, _safeSet } from '../../shared/lib/utils.js';
 import { toggleGrayscale } from '../../shared/lib/theme.js';
 
 const ACTIONS = [
-  { id: 'grayscale', label: '흑백 모드 전환' },
-  { id: 'goBack',    label: '뒤로가기' },
-  { id: 'newCard',   label: '새 티켓 생성' },
+  { id: 'grayscale',   label: '흑백 모드 전환' },
+  { id: 'goBack',      label: '뒤로가기' },
+  { id: 'newCard',     label: '새 티켓 생성' },
+  { id: 'recentCards', label: '최근 카드 열기' },
 ];
 
 const DEFAULTS = {
-  grayscale: { key: 'B',         shift: true,  alt: false, ctrlOrMeta: false },
-  goBack:    { key: 'ArrowLeft', shift: false, alt: true,  ctrlOrMeta: false },
-  newCard:   { key: 'n',         shift: false, alt: false, ctrlOrMeta: true  },
+  grayscale:   { key: 'B',         shift: true,  alt: false, ctrlOrMeta: false },
+  goBack:      { key: 'ArrowLeft', shift: false, alt: true,  ctrlOrMeta: false },
+  newCard:     { key: 'n',         shift: false, alt: false, ctrlOrMeta: true  },
+  recentCards: { key: 'e',         shift: false, alt: false, ctrlOrMeta: true  },
 };
 
 let _shortcuts = {};
@@ -81,6 +83,12 @@ function _handleKeydown(e) {
   if (_matchShortcut(e, _shortcuts.newCard)) {
     e.preventDefault();
     if (typeof window.openNewCard === 'function') window.openNewCard();
+    return;
+  }
+
+  if (_matchShortcut(e, _shortcuts.recentCards)) {
+    e.preventDefault();
+    if (typeof window.openRecentCards === 'function') window.openRecentCards();
     return;
   }
 }
