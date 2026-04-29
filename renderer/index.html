@@ -39,6 +39,9 @@
 
       var sidebar = localStorage.getItem('vk:sidebar') || 'open';
       document.documentElement.setAttribute('data-sidebar', sidebar);
+
+      var grayscale = localStorage.getItem('vk:grayscale');
+      if (grayscale === '1') document.documentElement.classList.add('grayscale-mode');
     } catch (e) {
       // localStorage 접근 실패 시 기본값
       document.documentElement.setAttribute('data-sidebar', 'open');
@@ -117,7 +120,17 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
           토큰 통계
         </button>
+        <button type="button" class="sidebar-stats-btn" id="shortcutsPanelToggle" onclick="toggleShortcutsPanel()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"></rect><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h12"></path></svg>
+          단축키 설정
+        </button>
       </div>
+
+      <!-- 단축키 설정 패널 -->
+      <section class="shortcuts-section" id="shortcutsSection" hidden>
+        <span class="section-title">단축키</span>
+        <div id="shortcutsList"></div>
+      </section>
     </div>
 
     <div class="sidebar-model">
@@ -190,7 +203,12 @@
               <span class="h-1.5 w-1.5 rounded-full opacity-40 bg-current"></span>
               <h2 class="text-xs font-semibold uppercase tracking-wider opacity-60">할 일</h2>
             </div>
-            <span class="text-xs font-mono opacity-40" id="cnt-todo">0</span>
+            <div class="flex items-center gap-1.5">
+              <span class="text-xs font-mono opacity-40" id="cnt-todo">0</span>
+              <button class="col-clear-btn" data-status="todo" title="이 열 전체 삭제" aria-label="이 열 전체 삭제">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4h6v2"></path></svg>
+              </button>
+            </div>
           </div>
           <div class="column-body" id="col-todo"></div>
         </div>
@@ -200,7 +218,12 @@
               <span class="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
               <h2 class="text-xs font-semibold uppercase tracking-wider text-cyan-400">진행 중</h2>
             </div>
-            <span class="text-xs font-mono opacity-40" id="cnt-doing">0</span>
+            <div class="flex items-center gap-1.5">
+              <span class="text-xs font-mono opacity-40" id="cnt-doing">0</span>
+              <button class="col-clear-btn" data-status="doing" title="이 열 전체 삭제" aria-label="이 열 전체 삭제">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4h6v2"></path></svg>
+              </button>
+            </div>
           </div>
           <div class="column-body" id="col-doing"></div>
         </div>
@@ -210,7 +233,12 @@
               <span class="h-1.5 w-1.5 rounded-full bg-indigo-400"></span>
               <h2 class="text-xs font-semibold uppercase tracking-wider text-indigo-400">검토</h2>
             </div>
-            <span class="text-xs font-mono opacity-40" id="cnt-review">0</span>
+            <div class="flex items-center gap-1.5">
+              <span class="text-xs font-mono opacity-40" id="cnt-review">0</span>
+              <button class="col-clear-btn" data-status="review" title="이 열 전체 삭제" aria-label="이 열 전체 삭제">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4h6v2"></path></svg>
+              </button>
+            </div>
           </div>
           <div class="column-body" id="col-review"></div>
         </div>
@@ -220,7 +248,12 @@
               <span class="h-1.5 w-1.5 rounded-full bg-amber-400"></span>
               <h2 class="text-xs font-semibold uppercase tracking-wider text-amber-400">문서</h2>
             </div>
-            <span class="text-xs font-mono opacity-40" id="cnt-document">0</span>
+            <div class="flex items-center gap-1.5">
+              <span class="text-xs font-mono opacity-40" id="cnt-document">0</span>
+              <button class="col-clear-btn" data-status="document" title="이 열 전체 삭제" aria-label="이 열 전체 삭제">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4h6v2"></path></svg>
+              </button>
+            </div>
           </div>
           <div class="column-body" id="col-document"></div>
         </div>
@@ -230,7 +263,12 @@
               <span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
               <h2 class="text-xs font-semibold uppercase tracking-wider text-emerald-400">완료</h2>
             </div>
-            <span class="text-xs font-mono opacity-40" id="cnt-done">0</span>
+            <div class="flex items-center gap-1.5">
+              <span class="text-xs font-mono opacity-40" id="cnt-done">0</span>
+              <button class="col-clear-btn" data-status="done" title="이 열 전체 삭제" aria-label="이 열 전체 삭제">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4h6v2"></path></svg>
+              </button>
+            </div>
           </div>
           <div class="column-body" id="col-done"></div>
         </div>

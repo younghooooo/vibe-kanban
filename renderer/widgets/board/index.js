@@ -5,6 +5,7 @@ import { getLabelColor } from '../../shared/config/index.js';
 import { getLabel, currentLabelFilter, setCurrentLabelFilter } from '../../entities/label/index.js';
 import { currentCategoryId, currentSearchQuery, setCurrentSearchQuery, filteredCards } from '../../entities/category/index.js';
 import { pushCardChange } from '../../features/github-sync/index.js';
+import { toast } from '../../shared/ui/toast.js';
 
 export function renderCard(card) {
   const cat = state.categories.find(c => c.id === card.category);
@@ -112,8 +113,43 @@ export function renderModelHint() {
   // modelPrice element removed — no-op kept for call-site compatibility
 }
 
+function _colCardSnapshot(card) {
+  let cost = 0;
+  let runs = 0;
+  if (Array.isArray(card.log)) {
+    for (const e of card.log) {
+      if (e?.type === 'usage' && typeof e.meta?.cost === 'number') cost += e.meta.cost;
+      if (e?.type === 'start') runs++;
+    }
+  }
+  return { id: card.id, createdAt: card.createdAt || 0, tokens: card.tokens || 0, cost, runs, categoryId: card.category || null, labelId: card.labelId || null };
+}
+
+export function clearColumn(status) {
+  const labels = { todo: '할 일', doing: '진행 중', review: '검토', document: '문서', done: '완료' };
+  const toDelete = filteredCards(state.cards, {
+    categoryId: currentCategoryId,
+    labelFilter: currentLabelFilter,
+    searchQuery: currentSearchQuery,
+  }).filter(c => c.status === status);
+  if (!toDelete.length) { toast('삭제할 카드가 없습니다.'); return; }
+  if (!confirm(`"${labels[status] || status}" 열의 카드 ${toDelete.length}개를 모두 삭제할까요?`)) return;
+  if (!Array.isArray(state.deletedCardSnapshots)) state.deletedCardSnapshots = [];
+  const ids = new Set(toDelete.map(c => c.id));
+  for (const card of toDelete) state.deletedCardSnapshots.push(_colCardSnapshot(card));
+  state.cards = state.cards.filter(c => !ids.has(c.id));
+  persist();
+  if (typeof window.renderColumns === 'function') window.renderColumns();
+  toast(`${toDelete.length}개 삭제됨`);
+}
+
 // Called once at init — uses event delegation so innerHTML swaps don't break listeners
 export function initBoardEvents() {
+  // Column clear buttons (static DOM — bind once)
+  document.querySelectorAll('.col-clear-btn').forEach(btn => {
+    btn.addEventListener('click', e => { e.stopPropagation(); clearColumn(btn.dataset.status); });
+  });
+
   const grid = document.getElementById('columns');
   if (grid) {
     grid.addEventListener('click', e => {

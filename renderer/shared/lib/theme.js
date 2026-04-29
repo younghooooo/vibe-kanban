@@ -1,6 +1,21 @@
 // shared/lib/theme.js
 import { _safeGet, _safeSet } from './utils.js';
 
+export function applyGrayscale(on) {
+  if (on) document.documentElement.classList.add('grayscale-mode');
+  else document.documentElement.classList.remove('grayscale-mode');
+}
+
+export function toggleGrayscale() {
+  const on = document.documentElement.classList.contains('grayscale-mode');
+  applyGrayscale(!on);
+  _safeSet('vk:grayscale', !on ? '1' : '0');
+}
+
+export function initGrayscale() {
+  if (_safeGet('vk:grayscale') === '1') applyGrayscale(true);
+}
+
 export function applyTheme(theme) {
   if (theme === 'dark') document.documentElement.classList.add('dark');
   else document.documentElement.classList.remove('dark');

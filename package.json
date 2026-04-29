@@ -28,8 +28,15 @@
       "renderer/**/*",
       "package.json"
     ],
-    "mac": { "category": "public.app-category.productivity", "target": "dmg" },
-    "win": { "target": "nsis" },
-    "linux": { "target": "AppImage" }
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": "dmg"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
   }
 }

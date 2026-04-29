@@ -1187,6 +1187,24 @@ export function openCard(id) {
 
 export function openNewCard(status = 'todo') {
   const id = uid();
+  const catId = (currentCategoryId !== 'all' ? currentCategoryId : null)
+              || (state.categories[0] && state.categories[0].id) || '';
+
+  // 현재 선택된 라벨 필터를 새 카드의 기본 라벨로 사용
+  const activeLabelId = (currentLabelFilter && currentLabelFilter !== '__none__') ? currentLabelFilter : null;
+
+  // Auto-fill cwd/refPaths from label paths
+  let cwd = '';
+  let refPaths = [];
+  if (activeLabelId) {
+    const label = getLabel(activeLabelId);
+    if (label) {
+      const paths = getLabelPaths(label);
+      if (paths.length > 0) cwd = paths[0];
+      refPaths = paths.slice(1);
+    }
+  }
+
   const card = {
     id,
     title: '',
@@ -1195,8 +1213,8 @@ export function openNewCard(status = 'todo') {
     docUpdatedAt: 0,
     docUpdatedBy: 'user',
     docHistory: [],
-    category: (currentCategoryId !== 'all' ? currentCategoryId : null)
-              || (state.categories[0] && state.categories[0].id) || '',
+    category: catId,
+    labelId: activeLabelId,
     priority: 'med',
     taskType: 'feature',
     status: status,
@@ -1205,7 +1223,8 @@ export function openNewCard(status = 'todo') {
     log: [],
     createdAt: Date.now(),
     model: '',
-    cwd: '',
+    cwd,
+    refPaths,
     autoRun: false,
     useSkills: false,
     _draft: true,    // Mark as draft until user enters any content

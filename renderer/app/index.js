@@ -5,7 +5,8 @@ import { DEFAULT_CATEGORIES, LABEL_COLORS, MODEL_PRICES, getLabelColor, hashLabe
 import { state, persist, loadFromDisk, clearStaleRuntimeFields } from './state.js';
 import { escapeHtml, truncate, nowHMS, formatTokens, formatCost, computeDiff, renderMarkdown, renderLogEntries, renderLogs, _safeGet, _safeSet, parseStreamLine, getWeekStart, resolveEffectiveAuth, autoresizeTextarea } from '../shared/lib/utils.js';
 import { showToast, toast, __toastContainer } from '../shared/ui/toast.js';
-import { applyTheme, toggleTheme, applySidebar, toggleSidebar, initThemeAndSidebar, initMoreMenu } from '../shared/lib/theme.js';
+import { applyTheme, toggleTheme, applySidebar, toggleSidebar, initThemeAndSidebar, initMoreMenu, toggleGrayscale, initGrayscale } from '../shared/lib/theme.js';
+import { initShortcuts, toggleShortcutsPanel } from '../features/shortcuts/index.js';
 import {
   currentLabelFilter, setCurrentLabelFilter,
   getLabel, createLabel, updateLabel, deleteLabel,
@@ -22,7 +23,7 @@ import {
 } from '../entities/category/index.js';
 import {
   renderCard, updateColumn, renderColumns, renderStats, renderModelHint,
-  initBoardEvents, initCardSearch, renderLabelFilterBar,
+  initBoardEvents, initCardSearch, renderLabelFilterBar, clearColumn,
 } from '../widgets/board/index.js';
 import { renderCategories, openCategoryEditor, closeCategoryModal, renderCategoryEditor } from '../widgets/sidebar/index.js';
 import {
@@ -104,10 +105,14 @@ Object.assign(window, {
   createLabel, updateLabel, deleteLabel, getLabel,
   // 렌더
   render, renderColumns, renderCategories, renderStats, renderDetail, renderModelHint,
+  // 컬럼 일괄 삭제
+  clearColumn,
   // AI ticker
   startElapsedTicker,
   // 검색
   openGlobalSearch, closeGlobalSearch,
+  // 단축키 설정 패널
+  toggleShortcutsPanel, toggleGrayscale,
   // GitHub
   syncAllGitHub, syncCurrentCategory,
   openGhConnectModal, closeGhConnectModal,
@@ -181,7 +186,9 @@ window.__mockPending = function(cardId) {
 // ===== INIT =====
 (async () => {
   try { initThemeAndSidebar(); } catch (e) { console.error('initThemeAndSidebar failed', e); }
+  try { initGrayscale(); } catch (e) { console.error('initGrayscale failed', e); }
   try { initMoreMenu(); } catch (e) { console.error('initMoreMenu failed', e); }
+  try { initShortcuts(); } catch (e) { console.error('initShortcuts failed', e); }
   try { initDetailView(); } catch (e) { console.error('initDetailView failed', e); }
   try { initCardSearch(); } catch (e) { console.error('initCardSearch failed', e); }
   try { initGlobalSearch(); } catch (e) { console.error('initGlobalSearch failed', e); }
