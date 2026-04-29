@@ -169,3 +169,26 @@ export function removeRepoFromCategory(catId, owner, repo) {
   persist();
   return true;
 }
+
+// === GitHub Projects v2 binding ===
+
+export function getCategoryProject(catId) {
+  const cat = state.categories.find(c => c.id === catId);
+  return (cat && cat.project) || null;
+}
+
+export function setCategoryProject(catId, project) {
+  const cat = state.categories.find(c => c.id === catId);
+  if (!cat) return false;
+  cat.project = project; // { ownerLogin, id, number, title, statusFieldId, statusOptions: [{id, name}] }
+  persist();
+  return true;
+}
+
+export function clearCategoryProject(catId) {
+  const cat = state.categories.find(c => c.id === catId);
+  if (!cat) return false;
+  delete cat.project;
+  persist();
+  return true;
+}

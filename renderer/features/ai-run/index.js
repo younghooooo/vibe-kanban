@@ -193,6 +193,16 @@ export async function runCard(card, opts = {}) {
   // Push USER log entry FIRST so the user sees their message even before auto-compact
   card.log = card.log || [];
   card.log.push({ type: 'user', time: nowHMS(), text: promptText });
+  // Clear input + flip running flag immediately so the textarea empties and the
+  // send button disables before auto-compact starts (which can take seconds).
+  card.desc = '';
+  card.running = true;
+  card.runStartedAt = Date.now();
+  const _descEl = document.getElementById('d-desc');
+  if (_descEl) {
+    _descEl.value = '';
+    autoresizeTextarea(_descEl);
+  }
   // Reflect immediately in UI
   if (state.view === 'detail' && state.detailCardId === card.id && typeof window.renderDetail === 'function') window.renderDetail();
   if (typeof window.renderColumns === 'function') window.renderColumns();
@@ -214,14 +224,6 @@ export async function runCard(card, opts = {}) {
         pushLog(card, 'AUTO-COMPACT', `compact 실패, 계속 진행: ${e}`);
       }
     }
-  }
-
-  // Clear textarea immediately so the user can type the next prompt
-  card.desc = '';
-  const descEl = document.getElementById('d-desc');
-  if (descEl) {
-    descEl.value = '';
-    autoresizeTextarea(descEl);
   }
 
   // Inline title generation using captured promptText (card.desc is now empty)

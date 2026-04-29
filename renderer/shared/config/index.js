@@ -35,6 +35,33 @@ export function getLabelColor(labelId) {
   return LABEL_COLORS[idx];
 }
 
+// Kanban columns (left → right)
+export const COLUMNS = ['todo', 'doing', 'review', 'document', 'done'];
+
+export const COLUMN_LABELS = {
+  todo: '할 일',
+  doing: '진행 중',
+  review: '검토',
+  document: '문서',
+  done: '완료',
+};
+
+// GitHub Projects v2 Status option name → kanban column
+export const STATUS_TO_COLUMN = {
+  'no status':   'todo',
+  'todo':        'todo',
+  'in progress': 'doing',
+  'qa':          'review',
+  'document':    'document',
+  'done':        'done',
+  'weekly done': 'done',
+};
+
+export function statusNameToColumn(name) {
+  if (!name) return 'todo';
+  return STATUS_TO_COLUMN[name.toLowerCase().trim()] || 'todo';
+}
+
 export const MODEL_PRICES = {
   'claude-opus-4-7':   { in: 15, out: 75, label: 'Opus 4.7' },
   'claude-sonnet-4-6': { in: 3,  out: 15, label: 'Sonnet 4.6' },

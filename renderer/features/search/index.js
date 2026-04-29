@@ -56,7 +56,7 @@ export function _renderGlobalSearchResults(query) {
     return;
   }
 
-  const STATUS_LABELS = { todo: '할 일', doing: '진행 중', review: '검토', done: '완료' };
+  const STATUS_LABELS = { todo: '할 일', doing: '진행 중', review: '검토', document: '문서', done: '완료' };
 
   function highlightMatch(text, q) {
     if (!q) return escapeHtml(text);

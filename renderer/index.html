@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8" />
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com https://esm.sh; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://esm.sh; connect-src 'self' https://esm.sh;">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com https://esm.sh; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://esm.sh; connect-src 'self' https://esm.sh https://api.github.com;">
 <title>Kanban</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -105,7 +105,6 @@
         <div class="cat-header flex items-center justify-between mb-3">
           <span class="section-title">카테고리</span>
           <div class="cat-header-actions">
-            <button type="button" class="btn-link" id="ghSyncBtn" onclick="syncAllGitHub()" title="GitHub 동기화">↻ GH</button>
             <button type="button" class="btn-link" onclick="promptCreateFolder()">+ 폴더</button>
             <button type="button" class="btn-link" onclick="openCategoryEditor()">+ 편집</button>
           </div>
@@ -152,6 +151,13 @@
             <span class="spinner is-small"></span>
             실행 중 <span id="boardRunningCount">0</span>개
           </div>
+          <button id="ghRefreshBtn" type="button" onclick="syncCurrentCategory()" class="btn btn-sm btn-ghost" title="이 프로젝트 GitHub 새로고침" hidden>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+          </button>
+          <button id="ghConnectBtn" type="button" onclick="openGhConnectModal()" class="btn btn-sm btn-ghost gap-1.5" title="GitHub 연결" hidden>
+            <span id="ghConnectBtnIcon">+</span>
+            <span id="ghConnectBtnLabel">깃허브</span>
+          </button>
           <button onclick="openNewCard()" class="btn btn-sm btn-primary border-0 font-semibold gap-1.5">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
               <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
@@ -208,6 +214,16 @@
           </div>
           <div class="column-body" id="col-review"></div>
         </div>
+        <div class="column-wrap" data-status="document">
+          <div class="flex items-center justify-between mb-3 px-1">
+            <div class="flex items-center gap-2">
+              <span class="h-1.5 w-1.5 rounded-full bg-amber-400"></span>
+              <h2 class="text-xs font-semibold uppercase tracking-wider text-amber-400">문서</h2>
+            </div>
+            <span class="text-xs font-mono opacity-40" id="cnt-document">0</span>
+          </div>
+          <div class="column-body" id="col-document"></div>
+        </div>
         <div class="column-wrap" data-status="done">
           <div class="flex items-center justify-between mb-3 px-1">
             <div class="flex items-center gap-2">
@@ -231,16 +247,15 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
           <span>보드</span>
         </button>
-        <span id="detailRunningIndicator" class="detail-running-indicator" hidden>
-          <span class="spinner is-small"></span>
-          <span>실행 중</span>
-          <span id="detailRunningElapsed"></span>
+        <span id="detailRunningIndicator" class="detail-running-indicator" hidden style="display:none;">
+          <span id="detailRunningElapsed" hidden></span>
         </span>
         <div class="detail-topbar-actions">
           <button type="button" id="detailWidthToggle" class="btn btn-ghost detail-width-toggle" aria-label="너비 전환" title="넓게 보기">
             <svg class="icon-expand" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
             <svg class="icon-compress" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 10 14 10 20"></polyline><polyline points="20 10 14 10 14 4"></polyline><line x1="14" y1="10" x2="21" y2="3"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
           </button>
+          <button type="button" id="detailGhRegister" class="btn btn-ghost" hidden onclick="openGhRegisterModal()">+ GitHub 이슈로 등록</button>
           <button type="button" id="detailExport" class="btn btn-ghost" hidden>.md 저장</button>
           <button type="button" id="detailDelete" class="btn btn-ghost btn-danger">삭제</button>
         </div>
@@ -282,7 +297,8 @@
             <select id="d-status" class="select-inline">
               <option value="todo">할 일</option>
               <option value="doing">진행 중</option>
-              <option value="review">리뷰</option>
+              <option value="review">검토</option>
+              <option value="document">문서</option>
               <option value="done">완료</option>
             </select>
           </div>
@@ -546,6 +562,89 @@
           <a href="https://github.com/settings/tokens" target="_blank" style="font-size:11px; opacity:0.6;">토큰 생성하기 →</a>
         </div>
       </details>
+    </div>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
+<!-- ============ GITHUB CONNECT MODAL ============ -->
+<dialog class="modal" id="ghConnectModal">
+  <div class="modal-box max-w-md border shadow-2xl p-0">
+    <header class="flex items-center justify-between px-5 py-3 border-b">
+      <h3 class="text-base font-semibold">GitHub 연결 <span id="ghConnectCatName" class="opacity-60 text-sm font-normal"></span></h3>
+      <button onclick="closeGhConnectModal()" class="btn btn-ghost btn-sm btn-icon" aria-label="Close">✕</button>
+    </header>
+    <div class="p-5 space-y-4">
+      <div id="ghConnectPatRow" class="space-y-1.5">
+        <label class="text-xs opacity-70">Personal Access Token <span class="opacity-50">(scope: repo)</span></label>
+        <div class="flex gap-2">
+          <input type="password" id="ghConnectPatInput" class="input flex-1 font-mono text-sm" placeholder="ghp_..." autocomplete="off" />
+          <button type="button" id="ghConnectPatConfirm" onclick="confirmGhPat()" class="btn btn-sm btn-primary border-0 font-semibold">확인</button>
+        </div>
+        <a href="#" id="ghConnectPatLink" class="text-[11px] opacity-60 hover:opacity-100">토큰 생성하기 →</a>
+        <p id="ghConnectPatStatus" class="text-[11px] opacity-60" hidden></p>
+      </div>
+      <div id="ghConnectOwnerRow" class="space-y-1.5" hidden>
+        <label class="text-xs opacity-70">Owner (사용자 또는 Organization login)</label>
+        <div class="flex gap-2">
+          <input type="text" id="ghConnectOwnerInput" class="input flex-1 font-mono text-sm" placeholder="예: AGMO-Inc" autocomplete="off" />
+          <button type="button" onclick="loadProjectsForOwner()" class="btn btn-sm btn-primary border-0 font-semibold">Project 불러오기</button>
+        </div>
+      </div>
+      <div id="ghConnectProjectRow" class="space-y-1.5" hidden>
+        <label class="text-xs opacity-70">Project 선택</label>
+        <div class="flex gap-2">
+          <select id="ghConnectProjectSelect" class="input flex-1 font-mono text-sm">
+            <option value="">불러오는 중…</option>
+          </select>
+          <button type="button" onclick="confirmGhProjectConnect()" class="btn btn-sm btn-primary border-0 font-semibold">연결</button>
+        </div>
+      </div>
+      <div>
+        <div class="text-xs opacity-70 mb-1.5">연결된 Project</div>
+        <ul id="ghConnectRepoList" class="flex flex-wrap gap-1.5 text-xs font-mono"></ul>
+      </div>
+    </div>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
+<!-- ============ GITHUB ISSUE REGISTER MODAL ============ -->
+<dialog class="modal" id="ghRegisterModal">
+  <div class="modal-box max-w-md border shadow-2xl p-0">
+    <header class="flex items-center justify-between px-5 py-3 border-b">
+      <h3 class="text-base font-semibold">GitHub 이슈로 등록</h3>
+      <button onclick="closeGhRegisterModal()" class="btn btn-ghost btn-sm btn-icon" aria-label="Close">✕</button>
+    </header>
+    <div class="p-5 space-y-3">
+      <p class="text-xs opacity-70">선택한 저장소에 새 이슈를 만들고, 카테고리에 연결된 Project에 추가합니다. 현재 컬럼이 Status로 매핑됩니다.</p>
+      <div class="space-y-1.5">
+        <label class="text-xs opacity-70">저장소</label>
+        <select id="ghRegisterRepoSelect" class="input w-full font-mono text-sm">
+          <option value="">불러오는 중…</option>
+        </select>
+      </div>
+      <div class="flex justify-end gap-2 pt-1">
+        <button class="btn btn-ghost btn-sm" onclick="closeGhRegisterModal()">취소</button>
+        <button class="btn btn-primary btn-sm border-0 font-semibold" onclick="confirmGhRegister()">등록</button>
+      </div>
+    </div>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
+<!-- ============ GITHUB PUSH CONFIRM MODAL ============ -->
+<dialog class="modal" id="ghPushConfirmModal">
+  <div class="modal-box max-w-sm border shadow-2xl p-0">
+    <header class="px-5 py-3 border-b">
+      <h3 class="text-base font-semibold">GitHub 이슈 수정</h3>
+    </header>
+    <div class="p-5 space-y-3">
+      <p class="text-sm" id="ghPushConfirmMsg">GitHub 이슈를 수정할까요?</p>
+      <div class="flex justify-end gap-2">
+        <button class="btn btn-ghost btn-sm" onclick="rejectGhPush()">취소</button>
+        <button class="btn btn-primary btn-sm border-0 font-semibold" onclick="approveGhPush()">확인</button>
+      </div>
     </div>
   </div>
   <form method="dialog" class="modal-backdrop"><button>close</button></form>

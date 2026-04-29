@@ -187,15 +187,22 @@ export async function renderDetail() {
     if (cp) { cp.hidden = true; cp.classList.remove('is-indeterminate'); }
   }
 
-  // stuck running 자동 복구: card.running이 true인데 실제 프로세스가 없으면 즉시 false로 복구
+  // stuck running 자동 복구: card.running이 true인데 실제 프로세스가 없으면 false로 복구.
+  // 단, 방금 시작한 경우(<= 10초)와 AUTO-COMPACT 중에는 자식 프로세스가 아직 없을 수
+  // 있으므로 grace period를 둔다 — 이 때문에 응답 대기 중 dots가 깜빡 사라지는 문제가 있었음.
   if (card.running && window.api && window.api.isCardRunning) {
-    try {
-      const actuallyRunning = await window.api.isCardRunning(card.id);
-      if (!actuallyRunning) {
-        card.running = false;
-        persist();
-      }
-    } catch (e) {}
+    const startedAt = card.runStartedAt || 0;
+    const recentlyStarted = startedAt && (Date.now() - startedAt) < 10000;
+    const isCompacting = state.compactingCardId === card.id;
+    if (!recentlyStarted && !isCompacting) {
+      try {
+        const actuallyRunning = await window.api.isCardRunning(card.id);
+        if (!actuallyRunning) {
+          card.running = false;
+          persist();
+        }
+      } catch (e) {}
+    }
   }
 
   const titleEl = document.getElementById('d-title');
@@ -208,6 +215,13 @@ export async function renderDetail() {
   const tokensEl = document.getElementById('d-tokens');
   const runBtn = document.getElementById('detailRun');
   const exportBtn = document.getElementById('detailExport');
+  const ghRegBtn = document.getElementById('detailGhRegister');
+  if (ghRegBtn) {
+    const cat = state.categories.find(c => c.id === card.category);
+    const hasProject = !!(cat && cat.project && cat.project.id);
+    const alreadyLinked = !!(card.github && card.github.projectItemId);
+    ghRegBtn.hidden = alreadyLinked || !hasProject;
+  }
 
   // Fill category options in flat order
   if (catEl) {
@@ -239,13 +253,15 @@ export async function renderDetail() {
   // Execution log
   const hasLog = Array.isArray(card.log) && card.log.length > 0;
   if (logBox) {
-    if (hasLog) {
-      logBox.innerHTML = renderLogEntries(card.log);
-      // Auto-scroll to bottom (latest)
-      logBox.scrollTop = logBox.scrollHeight;
-    } else {
-      logBox.innerHTML = `<div class="log-empty">아직 실행되지 않았습니다.</div>`;
+    let html = hasLog
+      ? renderLogEntries(card.log)
+      : `<div class="log-empty">아직 실행되지 않았습니다.</div>`;
+    if (card.running) {
+      html += `<div class="log-typing" aria-label="응답 대기 중"><span></span><span></span><span></span></div>`;
     }
+    logBox.innerHTML = html;
+    // Auto-scroll to bottom (latest)
+    logBox.scrollTop = logBox.scrollHeight;
   }
   if (tokensEl) {
     const parts = [];
@@ -263,7 +279,7 @@ export async function renderDetail() {
     runBtn.disabled = isRunning || isEmpty;
     runBtn.classList.toggle('is-loading', isRunning);
     if (isRunning) {
-      runBtn.innerHTML = `<span class="spinner is-small" style="border-color: rgba(255,255,255,0.35); border-top-color: #fff;"></span><span>전송 중…</span>`;
+      runBtn.innerHTML = `<span class="spinner is-small" style="border-color: rgba(255,255,255,0.35); border-top-color: #fff;"></span>`;
     } else {
       runBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg><span>전송</span>`;
     }
@@ -463,6 +479,7 @@ export function showBoard() {
   if (typeof window.renderColumns === 'function') window.renderColumns();
   if (typeof window.renderCategories === 'function') window.renderCategories();
   if (typeof window.renderStats === 'function') window.renderStats();
+  if (typeof window.updateGhButtons === 'function') window.updateGhButtons();
 }
 
 export function showDetail(cardId) {
