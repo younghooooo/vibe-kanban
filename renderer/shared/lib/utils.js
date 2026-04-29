@@ -94,6 +94,32 @@ export function renderMarkdown(text) {
     return '<ol class="md-list">' + items.map(it => `<li>${it}</li>`).join('') + '</ol>';
   });
 
+  // 8.5 GFM Tables — | h1 | h2 |\n|---|---|\n| c1 | c2 |
+  src = src.replace(
+    /(^\|[^\n]+\|[ \t]*\n^\|[ \t\-:|]+\|[ \t]*\n(?:^\|[^\n]+\|[ \t]*(?:\n|$))*)/gm,
+    (block) => {
+      const lines = block.trim().split(/\n/);
+      if (lines.length < 2) return block;
+      const splitRow = (l) => l.replace(/^\s*\|/, '').replace(/\|\s*$/, '').split('|').map(c => c.trim());
+      const headers = splitRow(lines[0]);
+      const aligns = splitRow(lines[1]).map(s => {
+        if (/^:.*:$/.test(s)) return 'center';
+        if (/:$/.test(s)) return 'right';
+        if (/^:/.test(s)) return 'left';
+        return '';
+      });
+      const bodyRows = lines.slice(2).filter(l => /^\s*\|/.test(l)).map(splitRow);
+      const thead = '<thead><tr>' + headers.map((h, i) =>
+        `<th${aligns[i] ? ` style="text-align:${aligns[i]}"` : ''}>${h}</th>`).join('') + '</tr></thead>';
+      const tbody = bodyRows.length
+        ? '<tbody>' + bodyRows.map(row =>
+            '<tr>' + row.map((c, i) =>
+              `<td${aligns[i] ? ` style="text-align:${aligns[i]}"` : ''}>${c}</td>`).join('') + '</tr>').join('') + '</tbody>'
+        : '';
+      return `<table class="md-table">${thead}${tbody}</table>`;
+    }
+  );
+
   // 9. Bold & italic (bold before italic to avoid ** being treated as italic)
   src = src.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
   src = src.replace(/(?<!\*)\*(?!\*)([^\n*]+?)\*(?!\*)/g, '<em>$1</em>');
@@ -107,7 +133,7 @@ export function renderMarkdown(text) {
     const trimmed = b.trim();
     if (!trimmed) return '';
     // Already a block-level element
-    if (/^<(h[1-6]|ul|ol|blockquote|pre|hr)/.test(trimmed)) return trimmed;
+    if (/^<(h[1-6]|ul|ol|blockquote|pre|hr|table)/.test(trimmed)) return trimmed;
     // Lone code block placeholder
     if (/^CODEBLOCK\d+$/.test(trimmed)) return trimmed;
     return '<p class="md-p">' + trimmed.replace(/\n/g, '<br>') + '</p>';
@@ -147,9 +173,8 @@ export function renderLogEntries(log) {
     }
   }
 
-  const reversed = log.slice().reverse();  // copy then reverse — newest first
-  return reversed.map((entry, reversedIdx) => {
-    const originalIdx = log.length - 1 - reversedIdx;
+  // Chronological — newest at bottom
+  return log.map((entry, originalIdx) => {
     if (skipIndices.has(originalIdx)) return '';
     let type = 'info', time = '', text = '';
     if (typeof entry === 'string') {
@@ -180,8 +205,10 @@ export function renderLogEntries(log) {
       // base64 encode payload for safe attribute storage
       const payloadB64 = btoa(unescape(encodeURIComponent(JSON.stringify({ filePath, before, after }))));
       return `<div class="log-entry log-entry-diff" data-diff="${payloadB64}">
-        <span class="log-badge log-badge-diff">DIFF</span>
-        ${time ? `<span class="log-time">${escapeHtml(time)}</span>` : ''}
+        <div class="log-entry-head">
+          <span class="log-badge log-badge-diff">DIFF</span>
+          ${time ? `<span class="log-time">${escapeHtml(time)}</span>` : ''}
+        </div>
         <div class="log-diff-body">
           <div class="log-diff-path">
             ${escapeHtml(filePath)}
@@ -206,16 +233,20 @@ export function renderLogEntries(log) {
     // RESULT and STREAM entries render inline with markdown content as a flex item
     if (type === 'result' || type === 'stream') {
       return `<div class="log-entry log-entry-${type}">
-        <span class="${badgeClass}">${badgeLabel}</span>
-        ${time ? `<span class="log-time">${escapeHtml(time)}</span>` : ''}
+        <div class="log-entry-head">
+          <span class="${badgeClass}">${badgeLabel}</span>
+          ${time ? `<span class="log-time">${escapeHtml(time)}</span>` : ''}
+        </div>
         <div class="log-text log-markdown">${renderMarkdown(text)}</div>
       </div>`;
     }
-    // All other types stay as plain inline text
+    // All other types stay as plain text
     return `<div class="log-entry log-entry-${type}">
-      <span class="${badgeClass}">${badgeLabel}</span>
-      ${time ? `<span class="log-time">${escapeHtml(time)}</span>` : ''}
-      <span class="log-text">${escapeHtml(text)}</span>
+      <div class="log-entry-head">
+        <span class="${badgeClass}">${badgeLabel}</span>
+        ${time ? `<span class="log-time">${escapeHtml(time)}</span>` : ''}
+      </div>
+      <div class="log-text">${escapeHtml(text)}</div>
     </div>`;
   }).filter(Boolean).join('');
 }

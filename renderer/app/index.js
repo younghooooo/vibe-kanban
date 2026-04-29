@@ -50,6 +50,15 @@ import {
 } from '../features/ai-run/index.js';
 import { exportCurrentMd, openExports, backupJson, resetAll, openExternal } from '../features/export/index.js';
 import {
+  syncAll as syncAllGitHub,
+  syncCurrentCategory,
+  openGhConnectModal, closeGhConnectModal,
+  confirmGhPat, loadProjectsForOwner, confirmGhProjectConnect, disconnectGhProject,
+  openGhRegisterModal, closeGhRegisterModal, confirmGhRegister,
+  approveGhPush, rejectGhPush,
+  updateGhButtons,
+} from '../features/github-sync/index.js';
+import {
   renderDetail, showBoard, showDetail,
   saveDetailField, initDetailView,
   openCard, openNewCard, closeModal, saveCard,
@@ -66,6 +75,7 @@ function render() {
   renderStats();
   renderLabelFilterBar();
   renderModelHint();
+  updateGhButtons();
 }
 
 // ===== 전역 노출 (HTML onclick + 내부 모듈 간 window.* 호출 대상) =====
@@ -98,6 +108,13 @@ Object.assign(window, {
   startElapsedTicker,
   // 검색
   openGlobalSearch, closeGlobalSearch,
+  // GitHub
+  syncAllGitHub, syncCurrentCategory,
+  openGhConnectModal, closeGhConnectModal,
+  confirmGhPat, loadProjectsForOwner, confirmGhProjectConnect, disconnectGhProject,
+  openGhRegisterModal, closeGhRegisterModal, confirmGhRegister,
+  approveGhPush, rejectGhPush,
+  updateGhButtons,
 });
 
 // ===== 전역 이벤트 바인딩 =====
@@ -199,6 +216,9 @@ window.__mockPending = function(cardId) {
   if (state.view === 'detail' && state.detailCardId) {
     showDetail(state.detailCardId);
   }
+
+  // Kick off GitHub sync after initial render — non-blocking
+  syncAllGitHub().catch(err => console.warn('GitHub sync failed:', err));
 
   const hasKey = await window.api.hasKey();
   if (!cliStatus.found && !hasKey) {

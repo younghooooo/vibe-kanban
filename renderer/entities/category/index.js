@@ -48,7 +48,8 @@ export function filteredCards(cards, { categoryId, labelFilter, searchQuery } = 
     const q = _searchQuery;
     result = result.filter(c =>
       c.title.toLowerCase().includes(q) ||
-      (c.desc || '').toLowerCase().includes(q)
+      (c.desc || '').toLowerCase().includes(q) ||
+      (c.doc || '').toLowerCase().includes(q)
     );
   }
 
@@ -66,6 +67,7 @@ export async function addCategory() {
     id: catUid(),
     name,
     folderId: null,
+    repos: [],
     createdAt: Date.now(),
   });
   await persist();
@@ -140,4 +142,53 @@ export function startRenameCategory(spanEl) {
     }
   });
   input.addEventListener('blur', () => commit(true));
+}
+
+export function getCategoryRepos(catId) {
+  const cat = state.categories.find(c => c.id === catId);
+  return (cat && cat.repos) || [];
+}
+
+export function addRepoToCategory(catId, owner, repo) {
+  const cat = state.categories.find(c => c.id === catId);
+  if (!cat) return false;
+  if (!cat.repos) cat.repos = [];
+  const exists = cat.repos.some(r => r.owner === owner && r.repo === repo);
+  if (exists) return false;
+  cat.repos.push({ owner, repo });
+  persist();
+  return true;
+}
+
+export function removeRepoFromCategory(catId, owner, repo) {
+  const cat = state.categories.find(c => c.id === catId);
+  if (!cat || !cat.repos) return false;
+  const idx = cat.repos.findIndex(r => r.owner === owner && r.repo === repo);
+  if (idx < 0) return false;
+  cat.repos.splice(idx, 1);
+  persist();
+  return true;
+}
+
+// === GitHub Projects v2 binding ===
+
+export function getCategoryProject(catId) {
+  const cat = state.categories.find(c => c.id === catId);
+  return (cat && cat.project) || null;
+}
+
+export function setCategoryProject(catId, project) {
+  const cat = state.categories.find(c => c.id === catId);
+  if (!cat) return false;
+  cat.project = project; // { ownerLogin, id, number, title, statusFieldId, statusOptions: [{id, name}] }
+  persist();
+  return true;
+}
+
+export function clearCategoryProject(catId) {
+  const cat = state.categories.find(c => c.id === catId);
+  if (!cat) return false;
+  delete cat.project;
+  persist();
+  return true;
 }

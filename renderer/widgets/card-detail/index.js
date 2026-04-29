@@ -1,6 +1,7 @@
 // widgets/card-detail/index.js
 import { state, persist } from '../../app/state.js';
 import { escapeHtml, autoresizeTextarea, computeDiff, nowHMS, renderLogEntries } from '../../shared/lib/utils.js';
+import { mountDocEditor, setDocMarkdown, getDocMarkdown, setDocReadOnly, isDocFocused, isDocMounted } from '../doc-editor/index.js';
 import { getLabelColor } from '../../shared/config/index.js';
 import { showToast, toast, __toastContainer } from '../../shared/ui/toast.js';
 import {
@@ -11,6 +12,7 @@ import { currentCategoryId } from '../../entities/category/index.js';
 import { getCategoriesInTreeOrder } from '../../entities/folder/index.js';
 import { uid } from '../../entities/card/index.js';
 import { runCard, runCurrent, doCompact, pushLog, startElapsedTicker } from '../../features/ai-run/index.js';
+import { pushCardChange } from '../../features/github-sync/index.js';
 import { exportCurrentMd } from '../../features/export/index.js';
 import { _globalSearchOpen } from '../../features/search/index.js';
 
@@ -185,15 +187,22 @@ export async function renderDetail() {
     if (cp) { cp.hidden = true; cp.classList.remove('is-indeterminate'); }
   }
 
-  // stuck running 자동 복구: card.running이 true인데 실제 프로세스가 없으면 즉시 false로 복구
+  // stuck running 자동 복구: card.running이 true인데 실제 프로세스가 없으면 false로 복구.
+  // 단, 방금 시작한 경우(<= 10초)와 AUTO-COMPACT 중에는 자식 프로세스가 아직 없을 수
+  // 있으므로 grace period를 둔다 — 이 때문에 응답 대기 중 dots가 깜빡 사라지는 문제가 있었음.
   if (card.running && window.api && window.api.isCardRunning) {
-    try {
-      const actuallyRunning = await window.api.isCardRunning(card.id);
-      if (!actuallyRunning) {
-        card.running = false;
-        persist();
-      }
-    } catch (e) {}
+    const startedAt = card.runStartedAt || 0;
+    const recentlyStarted = startedAt && (Date.now() - startedAt) < 10000;
+    const isCompacting = state.compactingCardId === card.id;
+    if (!recentlyStarted && !isCompacting) {
+      try {
+        const actuallyRunning = await window.api.isCardRunning(card.id);
+        if (!actuallyRunning) {
+          card.running = false;
+          persist();
+        }
+      } catch (e) {}
+    }
   }
 
   const titleEl = document.getElementById('d-title');
@@ -201,9 +210,18 @@ export async function renderDetail() {
   const catEl = document.getElementById('d-category');
   const statusEl = document.getElementById('d-status');
   const logBox = document.getElementById('d-logBox');
+  const docEl = document.getElementById('d-doc');
+  const docRevertBtn = document.getElementById('d-docRevert');
   const tokensEl = document.getElementById('d-tokens');
   const runBtn = document.getElementById('detailRun');
   const exportBtn = document.getElementById('detailExport');
+  const ghRegBtn = document.getElementById('detailGhRegister');
+  if (ghRegBtn) {
+    const cat = state.categories.find(c => c.id === card.category);
+    const hasProject = !!(cat && cat.project && cat.project.id);
+    const alreadyLinked = !!(card.github && card.github.projectItemId);
+    ghRegBtn.hidden = alreadyLinked || !hasProject;
+  }
 
   // Fill category options in flat order
   if (catEl) {
@@ -235,11 +253,15 @@ export async function renderDetail() {
   // Execution log
   const hasLog = Array.isArray(card.log) && card.log.length > 0;
   if (logBox) {
-    if (hasLog) {
-      logBox.innerHTML = renderLogEntries(card.log);
-    } else {
-      logBox.innerHTML = `<div class="log-empty">아직 실행되지 않았습니다.</div>`;
+    let html = hasLog
+      ? renderLogEntries(card.log)
+      : `<div class="log-empty">아직 실행되지 않았습니다.</div>`;
+    if (card.running) {
+      html += `<div class="log-typing" aria-label="응답 대기 중"><span></span><span></span><span></span></div>`;
     }
+    logBox.innerHTML = html;
+    // Auto-scroll to bottom (latest)
+    logBox.scrollTop = logBox.scrollHeight;
   }
   if (tokensEl) {
     const parts = [];
@@ -249,14 +271,17 @@ export async function renderDetail() {
   }
   if (exportBtn) exportBtn.hidden = !hasLog;
 
-  // Disable run button while running; show spinner when active
+  // Disable run button while running OR when textarea is empty; show spinner when active
   if (runBtn) {
     const isRunning = !!card.running;
-    runBtn.disabled = isRunning;
+    const descVal = (descEl && descEl.value !== undefined) ? descEl.value : (card.desc || '');
+    const isEmpty = !descVal.trim();
+    runBtn.disabled = isRunning || isEmpty;
+    runBtn.classList.toggle('is-loading', isRunning);
     if (isRunning) {
-      runBtn.innerHTML = `<span class="spinner is-small" style="border-color: rgba(255,255,255,0.35); border-top-color: #fff;"></span><span>실행 중…</span>`;
+      runBtn.innerHTML = `<span class="spinner is-small" style="border-color: rgba(255,255,255,0.35); border-top-color: #fff;"></span>`;
     } else {
-      runBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg><span>AI로 실행</span>`;
+      runBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg><span>전송</span>`;
     }
   }
 
@@ -406,6 +431,20 @@ export async function renderDetail() {
       }
     }
   }
+
+  // Doc — Tiptap editor: only sync when not focused so we don't clobber typing
+  if (docEl && isDocMounted()) {
+    if (!isDocFocused()) setDocMarkdown(card.doc || '');
+    setDocReadOnly(!!card.running);
+  }
+  const docRawEl = document.getElementById('d-docRaw');
+  if (docRawEl && !docRawEl.hidden && document.activeElement !== docRawEl) {
+    docRawEl.textContent = card.doc || '';
+    docRawEl.contentEditable = card.running ? 'false' : 'plaintext-only';
+  }
+  if (docRevertBtn) {
+    docRevertBtn.hidden = !(Array.isArray(card.docHistory) && card.docHistory.length > 0);
+  }
 }
 
 export function showBoard() {
@@ -440,6 +479,7 @@ export function showBoard() {
   if (typeof window.renderColumns === 'function') window.renderColumns();
   if (typeof window.renderCategories === 'function') window.renderCategories();
   if (typeof window.renderStats === 'function') window.renderStats();
+  if (typeof window.updateGhButtons === 'function') window.updateGhButtons();
 }
 
 export function showDetail(cardId) {
@@ -456,6 +496,45 @@ export function showDetail(cardId) {
 }
 
 const DETAIL_WIDE_KEY = 'vibe-kanban.detailWide';
+const DETAIL_META_COLLAPSED_KEY = 'vibe-kanban.detailMetaCollapsed';
+const DETAIL_DEBUG_KEY = 'vibe-kanban.detailDebug';
+const DETAIL_SIDE_W_KEY = 'vibe-kanban.detailSideWidth';
+const DOC_MODE_KEY = 'vibe-kanban.docMode';
+
+function applyDocMode(mode) {
+  const docEl = document.getElementById('d-doc');
+  const rawEl = document.getElementById('d-docRaw');
+  const btn = document.getElementById('d-docMode');
+  if (!docEl || !rawEl || !btn) return;
+  const isMd = mode === 'md';
+  docEl.hidden = isMd;
+  rawEl.hidden = !isMd;
+  btn.dataset.mode = isMd ? 'md' : 'edit';
+  const label = btn.querySelector('.doc-mini-label');
+  if (label) label.textContent = isMd ? 'edit' : 'md';
+  btn.title = isMd ? '에디터로 전환' : 'MD 원본으로 전환';
+}
+
+function applyDetailMetaPref() {
+  const collapsed = localStorage.getItem(DETAIL_META_COLLAPSED_KEY) === '1';
+  const meta = document.getElementById('detailMeta');
+  const btn = document.getElementById('detailMetaToggle');
+  if (meta) meta.hidden = collapsed;
+  if (btn) btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+}
+function applyDetailDebugPref() {
+  const on = localStorage.getItem(DETAIL_DEBUG_KEY) === '1';
+  const box = document.getElementById('d-logBox');
+  const cb = document.getElementById('detailDebugToggle');
+  if (box) box.classList.toggle('is-debug-off', !on);
+  if (cb) cb.checked = on;
+}
+function applyDetailSideWidth() {
+  const saved = parseInt(localStorage.getItem(DETAIL_SIDE_W_KEY) || '', 10);
+  if (!Number.isFinite(saved) || saved <= 0) return;
+  const dv = document.getElementById('detailView');
+  if (dv) dv.style.setProperty('--detail-side-w', saved + 'px');
+}
 
 function applyDetailWidthPref(dv) {
   const wide = localStorage.getItem(DETAIL_WIDE_KEY) === '1';
@@ -467,7 +546,11 @@ function applyDetailWidthPref(dv) {
 export function saveDetailField(field, value) {
   const card = state.cards.find(c => c.id === state.detailCardId);
   if (!card) return;
+  const prevStatus = card.status;
   card[field] = value;
+  if (field === 'status' && prevStatus !== value) {
+    pushCardChange(card, { prevStatus });
+  }
   // Clear draft flag when user enters any meaningful content
   if (card._draft) {
     const hasContent =
@@ -503,10 +586,189 @@ export function initDetailView() {
     applyDetailWidthPref(dv);
   });
 
-  // Autoresize for AI command textarea
+  // Meta collapse toggle
+  applyDetailMetaPref();
+  const metaBtn = document.getElementById('detailMetaToggle');
+  if (metaBtn) metaBtn.addEventListener('click', () => {
+    const cur = localStorage.getItem(DETAIL_META_COLLAPSED_KEY) === '1';
+    localStorage.setItem(DETAIL_META_COLLAPSED_KEY, cur ? '0' : '1');
+    applyDetailMetaPref();
+  });
+
+  // Debug toggle (INFO·USAGE·START·AUTO-COMPACT 표시 여부)
+  applyDetailDebugPref();
+  const dbgCb = document.getElementById('detailDebugToggle');
+  if (dbgCb) dbgCb.addEventListener('change', () => {
+    localStorage.setItem(DETAIL_DEBUG_KEY, dbgCb.checked ? '1' : '0');
+    applyDetailDebugPref();
+  });
+
+  // Doc editor — Tiptap notion-style live Markdown
+  const docEl = document.getElementById('d-doc');
+  const docRevertBtn = document.getElementById('d-docRevert');
+  const docRawEl = document.getElementById('d-docRaw');
+  const docModeBtn = document.getElementById('d-docMode');
+
+  // Restore mode preference
+  applyDocMode(localStorage.getItem(DOC_MODE_KEY) === 'md' ? 'md' : 'edit');
+
+  if (docModeBtn) {
+    docModeBtn.addEventListener('click', () => {
+      const cur = docModeBtn.dataset.mode || 'edit';
+      const next = cur === 'edit' ? 'md' : 'edit';
+      const card = state.cards.find(c => c.id === state.detailCardId);
+      if (next === 'md') {
+        const md = isDocMounted() ? getDocMarkdown() : (card ? (card.doc || '') : '');
+        if (docRawEl) {
+          docRawEl.textContent = md;
+          docRawEl.contentEditable = (card && card.running) ? 'false' : 'plaintext-only';
+        }
+      } else {
+        if (card && docRawEl) {
+          const md = docRawEl.textContent || '';
+          if (md !== (card.doc || '')) {
+            card.doc = md;
+            card.docUpdatedAt = Date.now();
+            card.docUpdatedBy = 'user';
+            persist();
+          }
+          if (isDocMounted()) setDocMarkdown(md, { force: true });
+        }
+      }
+      localStorage.setItem(DOC_MODE_KEY, next);
+      applyDocMode(next);
+    });
+  }
+
+  if (docRawEl) {
+    let rawSaveTimer = null;
+    docRawEl.addEventListener('input', () => {
+      const card = state.cards.find(c => c.id === state.detailCardId);
+      if (!card || card.running) return;
+      if (rawSaveTimer) clearTimeout(rawSaveTimer);
+      rawSaveTimer = setTimeout(() => {
+        const md = docRawEl.textContent || '';
+        card.doc = md;
+        card.docUpdatedAt = Date.now();
+        card.docUpdatedBy = 'user';
+        if (card._draft && md.trim()) delete card._draft;
+        persist();
+      }, 400);
+    });
+    docRawEl.addEventListener('paste', (e) => {
+      e.preventDefault();
+      const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+      document.execCommand('insertText', false, text);
+    });
+  }
+  if (docEl) {
+    mountDocEditor(docEl, {
+      initial: '',
+      placeholder: '# 제목을 입력하거나 본문을 적어보세요…',
+      onChange: (md) => {
+        const card = state.cards.find(c => c.id === state.detailCardId);
+        if (!card || card.running) return;
+        if ((card.doc || '') === md) return;
+        card.doc = md;
+        card.docUpdatedAt = Date.now();
+        card.docUpdatedBy = 'user';
+        if (card._draft && md.trim()) delete card._draft;
+        persist();
+      },
+    }).then(() => {
+      // Sync the currently-open card after editor is ready
+      const card = state.cards.find(c => c.id === state.detailCardId);
+      if (card) {
+        setDocMarkdown(card.doc || '');
+        setDocReadOnly(!!card.running);
+      }
+    }).catch(err => {
+      console.error('Tiptap mount failed', err);
+      docEl.textContent = 'Markdown 에디터 로드 실패: ' + (err && err.message || err);
+    });
+  }
+  if (docRevertBtn) {
+    docRevertBtn.addEventListener('click', () => {
+      const card = state.cards.find(c => c.id === state.detailCardId);
+      if (!card || !Array.isArray(card.docHistory) || card.docHistory.length === 0) return;
+      const last = card.docHistory.pop();
+      const before = card.doc;
+      card.doc = last.snapshot || '';
+      card.docUpdatedAt = Date.now();
+      card.docUpdatedBy = 'user';
+      // Push the just-replaced version onto history at the front so revert is reversible
+      card.docHistory.unshift({ ts: Date.now(), by: 'revert', snapshot: before });
+      // Trim history
+      if (card.docHistory.length > 20) card.docHistory.length = 20;
+      persist();
+      if (typeof window.renderDetail === 'function') window.renderDetail();
+      showToast('직전 버전으로 되돌렸습니다.', 'info');
+    });
+  }
+
+  // Splitter drag — resize side pane
+  applyDetailSideWidth();
+  const splitter = document.getElementById('detailSplitter');
+  if (splitter && dv) {
+    const beginDrag = (startX) => {
+      const rect = dv.getBoundingClientRect();
+      const styles = getComputedStyle(dv);
+      const startW = parseInt(styles.getPropertyValue('--detail-side-w')) || 420;
+      splitter.classList.add('is-dragging');
+      document.body.classList.add('detail-splitter-dragging');
+      const onMove = (e) => {
+        const dx = (e.clientX ?? (e.touches && e.touches[0]?.clientX) ?? startX) - startX;
+        // Dragging splitter left grows the side pane
+        let nextW = startW - dx;
+        const maxW = Math.max(280, Math.floor(rect.width - 360));
+        const minW = 280;
+        nextW = Math.min(maxW, Math.max(minW, nextW));
+        dv.style.setProperty('--detail-side-w', nextW + 'px');
+      };
+      const onUp = () => {
+        splitter.classList.remove('is-dragging');
+        document.body.classList.remove('detail-splitter-dragging');
+        const final = parseInt(getComputedStyle(dv).getPropertyValue('--detail-side-w')) || 420;
+        localStorage.setItem(DETAIL_SIDE_W_KEY, String(final));
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+        window.removeEventListener('touchmove', onMove);
+        window.removeEventListener('touchend', onUp);
+      };
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+      window.addEventListener('touchmove', onMove, { passive: true });
+      window.addEventListener('touchend', onUp);
+    };
+    splitter.addEventListener('mousedown', (e) => { e.preventDefault(); beginDrag(e.clientX); });
+    splitter.addEventListener('touchstart', (e) => {
+      const t = e.touches && e.touches[0]; if (t) beginDrag(t.clientX);
+    });
+    splitter.addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      e.preventDefault();
+      const cur = parseInt(getComputedStyle(dv).getPropertyValue('--detail-side-w')) || 420;
+      const step = e.shiftKey ? 40 : 16;
+      const next = Math.min(900, Math.max(280, cur + (e.key === 'ArrowLeft' ? step : -step)));
+      dv.style.setProperty('--detail-side-w', next + 'px');
+      localStorage.setItem(DETAIL_SIDE_W_KEY, String(next));
+    });
+  }
+
+  // Autoresize for AI command textarea + send button enable/disable on typing
   if (desc) {
-    desc.addEventListener('input', () => autoresizeTextarea(desc));
+    const updateSendDisabled = () => {
+      const runBtnEl = document.getElementById('detailRun');
+      if (!runBtnEl) return;
+      const card = state.cards.find(c => c.id === state.detailCardId);
+      const isRunning = !!(card && card.running);
+      const isEmpty = !desc.value.trim();
+      runBtnEl.disabled = isRunning || isEmpty;
+    };
+    desc.addEventListener('input', () => { autoresizeTextarea(desc); updateSendDisabled(); });
     desc.addEventListener('focus', () => autoresizeTextarea(desc));
+    // Initial state
+    updateSendDisabled();
   }
 
   // Enter = 실행, Shift+Enter = 줄바꿈
@@ -929,6 +1191,10 @@ export function openNewCard(status = 'todo') {
     id,
     title: '',
     desc: '',
+    doc: '',
+    docUpdatedAt: 0,
+    docUpdatedBy: 'user',
+    docHistory: [],
     category: (currentCategoryId !== 'all' ? currentCategoryId : null)
               || (state.categories[0] && state.categories[0].id) || '',
     priority: 'med',
@@ -948,6 +1214,7 @@ export function openNewCard(status = 'todo') {
   // Do not persist yet — draft card is memory-only until content is entered
   showDetail(id);
 }
+
 
 export function closeModal() {
   /* legacy no-op — card modal removed */

@@ -132,5 +132,18 @@ export async function loadFromDisk() {
   migrateCategories();
   migrateCategoriesToFolders();
   migrateLabels();
+  migrateCardDocs();
   await clearStaleRuntimeFields();
+}
+
+export function migrateCardDocs() {
+  if (!Array.isArray(state.cards)) return;
+  let changed = false;
+  state.cards.forEach(c => {
+    if (typeof c.doc !== 'string') { c.doc = ''; changed = true; }
+    if (typeof c.docUpdatedAt !== 'number') { c.docUpdatedAt = 0; changed = true; }
+    if (typeof c.docUpdatedBy !== 'string') { c.docUpdatedBy = 'user'; changed = true; }
+    if (!Array.isArray(c.docHistory)) { c.docHistory = []; changed = true; }
+  });
+  if (changed) persist();
 }

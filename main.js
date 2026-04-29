@@ -8,6 +8,7 @@ const fs = require('fs');
 const https = require('https');
 const { spawn, execSync } = require('child_process');
 const os = require('os');
+const crypto = require('crypto');
 
 // Map of cardId -> child process (for pending confirmation IPC)
 const runningProcesses = new Map();
@@ -20,6 +21,22 @@ const isDev = process.argv.includes('--dev');
 const getSettingsPath = () => path.join(app.getPath('userData'), 'settings.json');
 const getDataPath = () => path.join(app.getPath('userData'), 'kanban-data.json');
 const getExportDir = () => path.join(app.getPath('userData'), 'exports');
+const getDocFallbackDir = () => path.join(app.getPath('userData'), 'cardDocs');
+
+function resolveDocPath(cardId, cwd) {
+  const safeId = String(cardId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+  if (!safeId) throw new Error('invalid cardId');
+  if (cwd && typeof cwd === 'string' && fs.existsSync(cwd)) {
+    const dir = path.join(cwd, '.vibe-kanban');
+    return { path: path.join(dir, safeId + '.md'), dir, scope: 'cwd' };
+  }
+  const dir = getDocFallbackDir();
+  return { path: path.join(dir, safeId + '.md'), dir, scope: 'fallback' };
+}
+
+function hashContent(s) {
+  return crypto.createHash('sha1').update(String(s || ''), 'utf-8').digest('hex');
+}
 
 let mainWindow = null;
 
@@ -136,6 +153,38 @@ ipcMain.handle('data:save', async (_e, data) => {
   try {
     fs.writeFileSync(getDataPath(), JSON.stringify(data, null, 2), 'utf-8');
     return { ok: true };
+  } catch (err) { return { ok: false, error: err.message }; }
+});
+
+// Card doc IPC — write/read Markdown doc for a card
+ipcMain.handle('doc:path', async (_e, { cardId, cwd }) => {
+  try {
+    const r = resolveDocPath(cardId, cwd);
+    return { ok: true, path: r.path, scope: r.scope };
+  } catch (err) { return { ok: false, error: err.message }; }
+});
+ipcMain.handle('doc:write', async (_e, { cardId, cwd, content }) => {
+  try {
+    const r = resolveDocPath(cardId, cwd);
+    if (!fs.existsSync(r.dir)) {
+      fs.mkdirSync(r.dir, { recursive: true });
+      // Auto-write a .gitignore so the docs dir doesn't pollute the repo
+      if (r.scope === 'cwd') {
+        try { fs.writeFileSync(path.join(r.dir, '.gitignore'), '*\n!.gitignore\n', 'utf-8'); } catch {}
+      }
+    }
+    fs.writeFileSync(r.path, String(content || ''), 'utf-8');
+    const st = fs.statSync(r.path);
+    return { ok: true, path: r.path, scope: r.scope, mtimeMs: st.mtimeMs, hash: hashContent(content) };
+  } catch (err) { return { ok: false, error: err.message }; }
+});
+ipcMain.handle('doc:read', async (_e, { cardId, cwd }) => {
+  try {
+    const r = resolveDocPath(cardId, cwd);
+    if (!fs.existsSync(r.path)) return { ok: true, exists: false, content: '', path: r.path, scope: r.scope };
+    const content = fs.readFileSync(r.path, 'utf-8');
+    const st = fs.statSync(r.path);
+    return { ok: true, exists: true, content, path: r.path, scope: r.scope, mtimeMs: st.mtimeMs, hash: hashContent(content) };
   } catch (err) { return { ok: false, error: err.message }; }
 });
 

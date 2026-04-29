@@ -1,7 +1,57 @@
 // entities/card/index.js
+import { state } from '../../app/state.js';
+import { statusNameToColumn } from '../../shared/config/index.js';
 
 export function uid() { return 'c_' + Math.random().toString(36).slice(2, 9); }
 export function catUid() { return 'cat_' + Math.random().toString(36).slice(2, 7); }
+
+export function findCardByIssue(owner, repo, issueNumber) {
+  return state.cards.find(c =>
+    c.github &&
+    c.github.owner === owner &&
+    c.github.repo === repo &&
+    c.github.issueNumber === issueNumber
+  ) || null;
+}
+
+export function findCardByProjectItem(projectId, itemId) {
+  return state.cards.find(c =>
+    c.github && c.github.projectId === projectId && c.github.projectItemId === itemId
+  ) || null;
+}
+
+export function buildCardFromProjectItem(item, categoryId, projectId) {
+  const { issue, statusName, statusOptionId, itemId } = item;
+  const column = statusNameToColumn(statusName);
+  return {
+    id: uid(),
+    title: issue.title,
+    desc: issue.body || '',
+    doc: '',
+    docUpdatedAt: 0,
+    docUpdatedBy: 'user',
+    docHistory: [],
+    category: categoryId,
+    priority: 'med',
+    status: column,
+    progress: column === 'done' ? 100 : 0,
+    tokens: 0,
+    log: [],
+    createdAt: Date.now(),
+    github: {
+      projectId,
+      projectItemId: itemId,
+      statusName,
+      statusOptionId,
+      issueNumber: issue.number,
+      owner: issue.owner,
+      repo: issue.repo,
+      state: issue.state,
+      htmlUrl: issue.url,
+      updatedAt: issue.updatedAt,
+    },
+  };
+}
 
 export function sampleCards() {
   return [
