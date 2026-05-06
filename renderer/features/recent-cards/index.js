@@ -90,6 +90,14 @@ function _move(dir) {
   }
 }
 
+function _scrollToBottom() {
+  if (window.innerWidth >= 1024) return;
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const main = document.querySelector('.main');
+    if (main) main.scrollTop = main.scrollHeight;
+  }));
+}
+
 function _confirm() {
   const container = document.getElementById('recentCardsList');
   if (!container) return;
@@ -98,6 +106,7 @@ function _confirm() {
     const cardId = active.dataset.id;
     closeRecentCards();
     if (typeof window.openCard === 'function') window.openCard(cardId);
+    _scrollToBottom();
   }
 }
 
@@ -118,7 +127,7 @@ export function initRecentCards() {
 
   list.addEventListener('click', (e) => {
     const item = e.target.closest('.recent-cards-item');
-    if (item) { closeRecentCards(); if (typeof window.openCard === 'function') window.openCard(item.dataset.id); }
+    if (item) { closeRecentCards(); if (typeof window.openCard === 'function') window.openCard(item.dataset.id); _scrollToBottom(); }
   });
 
   overlay.addEventListener('click', (e) => {

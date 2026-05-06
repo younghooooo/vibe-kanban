@@ -1,16 +1,16 @@
 // features/shortcuts/index.js
 import { _safeGet, _safeSet } from '../../shared/lib/utils.js';
-import { toggleGrayscale } from '../../shared/lib/theme.js';
+import { toggleTheme } from '../../shared/lib/theme.js';
 
 const ACTIONS = [
-  { id: 'grayscale',   label: '흑백 모드 전환' },
+  { id: 'darkMode',    label: '다크/라이트 모드 전환' },
   { id: 'goBack',      label: '뒤로가기' },
   { id: 'newCard',     label: '새 티켓 생성' },
   { id: 'recentCards', label: '최근 카드 열기' },
 ];
 
 const DEFAULTS = {
-  grayscale:   { key: 'B',         shift: true,  alt: false, ctrlOrMeta: false },
+  darkMode:    { key: 'B',         shift: true,  alt: false, ctrlOrMeta: false },
   goBack:      { key: 'ArrowLeft', shift: false, alt: true,  ctrlOrMeta: false },
   newCard:     { key: 'n',         shift: false, alt: false, ctrlOrMeta: true  },
   recentCards: { key: 'e',         shift: false, alt: false, ctrlOrMeta: true  },
@@ -68,9 +68,9 @@ function _handleKeydown(e) {
     return;
   }
 
-  if (_matchShortcut(e, _shortcuts.grayscale)) {
+  if (_matchShortcut(e, _shortcuts.darkMode)) {
     e.preventDefault();
-    toggleGrayscale();
+    toggleTheme();
     return;
   }
 
