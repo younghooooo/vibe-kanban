@@ -1,11 +1,11 @@
 // widgets/board/index.js
-import { state, persist } from '../../app/state.js';
-import { escapeHtml, truncate } from '../../shared/lib/utils.js';
-import { getLabelColor } from '../../shared/config/index.js';
-import { getLabel, currentLabelFilter, setCurrentLabelFilter } from '../../entities/label/index.js';
-import { currentCategoryId, currentSearchQuery, setCurrentSearchQuery, filteredCards } from '../../entities/category/index.js';
-import { pushCardChange } from '../../features/github-sync/index.js';
-import { toast } from '../../shared/ui/toast.js';
+import { state, persist } from '../../app/state.ts';
+import { escapeHtml, truncate } from '../../shared/lib/utils.ts';
+import { getLabelColor } from '../../shared/config/index.ts';
+import { getLabel, currentLabelFilter, setCurrentLabelFilter } from '../../entities/label/index.ts';
+import { currentCategoryId, currentSearchQuery, setCurrentSearchQuery, filteredCards } from '../../entities/category/index.ts';
+import { pushCardChange } from '../../features/github-sync/index.ts';
+import { toast } from '../../shared/ui/toast.ts';
 
 export function renderCard(card) {
   const cat = state.categories.find(c => c.id === card.category);

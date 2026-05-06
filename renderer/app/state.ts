@@ -1,6 +1,6 @@
 // app/state.js
-import { DEFAULT_CATEGORIES } from '../shared/config/index.js';
-import { sampleCards } from '../entities/card/index.js';
+import { DEFAULT_CATEGORIES } from '../shared/config/index.ts';
+import { sampleCards } from '../entities/card/index.ts';
 
 export const state = {
   folders: [],

@@ -1,6 +1,6 @@
 // features/recent-cards/index.js
-import { state } from '../../app/state.js';
-import { escapeHtml } from '../../shared/lib/utils.js';
+import { state } from '../../app/state.ts';
+import { escapeHtml } from '../../shared/lib/utils.ts';
 
 export let _recentCardsOpen = false;
 let _selectedIdx = 0;

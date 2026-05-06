@@ -2,19 +2,33 @@
   "name": "vibe-kanban",
   "version": "0.3.0",
   "description": "AI-powered personal kanban board with Claude",
-  "main": "main.js",
+  "main": "out/main/index.js",
   "scripts": {
-    "start": "electron .",
-    "dev": "electron . --dev",
-    "build:mac": "electron-builder --mac",
-    "build:win": "electron-builder --win",
-    "build:linux": "electron-builder --linux"
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "start": "electron-vite preview",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:linux": "npm run build && electron-builder --linux"
   },
   "author": "you",
   "license": "MIT",
+  "dependencies": {
+    "@tiptap/core": "^2.0.0",
+    "@tiptap/extension-code-block-lowlight": "^2.0.0",
+    "@tiptap/extension-placeholder": "^2.0.0",
+    "@tiptap/extension-task-item": "^2.0.0",
+    "@tiptap/extension-task-list": "^2.0.0",
+    "@tiptap/starter-kit": "^2.0.0",
+    "lowlight": "^3.0.0",
+    "tiptap-markdown": "^0.8.0"
+  },
   "devDependencies": {
+    "@types/node": "^20.0.0",
     "electron": "^33.0.0",
-    "electron-builder": "^25.0.0"
+    "electron-builder": "^25.0.0",
+    "electron-vite": "^2.0.0",
+    "typescript": "^5.0.0"
   },
   "build": {
     "appId": "com.you.vibekanban",
@@ -23,9 +37,7 @@
       "output": "dist"
     },
     "files": [
-      "main.js",
-      "preload.js",
-      "renderer/**/*",
+      "out/**/*",
       "package.json"
     ],
     "mac": {

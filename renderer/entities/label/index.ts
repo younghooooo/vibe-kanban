@@ -1,10 +1,10 @@
 // entities/label/index.js
-import { state, persist } from '../../app/state.js';
-import { getLabelColor } from '../../shared/config/index.js';
-import { toast } from '../../shared/ui/toast.js';
+import { state, persist } from '../../app/state.ts';
+import { getLabelColor } from '../../shared/config/index.ts';
+import { toast } from '../../shared/ui/toast.ts';
 
 // Re-export getLabelColor from config for convenience
-export { getLabelColor } from '../../shared/config/index.js';
+export { getLabelColor } from '../../shared/config/index.ts';
 
 export let currentLabelFilter = null;
 

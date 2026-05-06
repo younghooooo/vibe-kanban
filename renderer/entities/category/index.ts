@@ -1,8 +1,8 @@
 // entities/category/index.js
-import { state, persist } from '../../app/state.js';
-import { escapeHtml } from '../../shared/lib/utils.js';
-import { toast } from '../../shared/ui/toast.js';
-import { catUid } from '../card/index.js';
+import { state, persist } from '../../app/state.ts';
+import { escapeHtml } from '../../shared/lib/utils.ts';
+import { toast } from '../../shared/ui/toast.ts';
+import { catUid } from '../card/index.ts';
 
 export let currentCategoryId = 'all';
 export let currentSearchQuery = '';

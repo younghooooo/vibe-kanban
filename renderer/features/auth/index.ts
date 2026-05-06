@@ -1,6 +1,6 @@
 // features/auth/index.js
-import { escapeHtml, resolveEffectiveAuth } from '../../shared/lib/utils.js';
-import { toast } from '../../shared/ui/toast.js';
+import { escapeHtml, resolveEffectiveAuth } from '../../shared/lib/utils.ts';
+import { toast } from '../../shared/ui/toast.ts';
 
 export let cliStatus = { found: false };
 export let currentAuthMode = 'auto';

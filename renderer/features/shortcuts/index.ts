@@ -1,6 +1,6 @@
 // features/shortcuts/index.js
-import { _safeGet, _safeSet } from '../../shared/lib/utils.js';
-import { toggleTheme } from '../../shared/lib/theme.js';
+import { _safeGet, _safeSet } from '../../shared/lib/utils.ts';
+import { toggleTheme } from '../../shared/lib/theme.ts';
 
 const ACTIONS = [
   { id: 'darkMode',    label: '다크/라이트 모드 전환' },

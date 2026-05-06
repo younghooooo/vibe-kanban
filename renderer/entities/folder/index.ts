@@ -1,6 +1,6 @@
 // entities/folder/index.js
-import { state, persist } from '../../app/state.js';
-import { escapeHtml } from '../../shared/lib/utils.js';
+import { state, persist } from '../../app/state.ts';
+import { escapeHtml } from '../../shared/lib/utils.ts';
 
 export function getFolder(id) {
   return state.folders.find(f => f.id === id) || null;

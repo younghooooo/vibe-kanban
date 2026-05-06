@@ -1,5 +1,5 @@
 // shared/lib/theme.js
-import { _safeGet, _safeSet } from './utils.js';
+import { _safeGet, _safeSet } from './utils.ts';
 
 export function applyGrayscale(on) {
   if (on) document.documentElement.classList.add('grayscale-mode');

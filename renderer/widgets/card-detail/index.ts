@@ -1,20 +1,20 @@
 // widgets/card-detail/index.js
-import { state, persist } from '../../app/state.js';
-import { escapeHtml, autoresizeTextarea, computeDiff, nowHMS, renderLogEntries } from '../../shared/lib/utils.js';
-import { mountDocEditor, setDocMarkdown, getDocMarkdown, setDocReadOnly, isDocFocused, isDocMounted } from '../doc-editor/index.js';
-import { getLabelColor } from '../../shared/config/index.js';
-import { showToast, toast, __toastContainer } from '../../shared/ui/toast.js';
+import { state, persist } from '../../app/state.ts';
+import { escapeHtml, autoresizeTextarea, computeDiff, nowHMS, renderLogEntries } from '../../shared/lib/utils.ts';
+import { mountDocEditor, setDocMarkdown, getDocMarkdown, setDocReadOnly, isDocFocused, isDocMounted } from '../doc-editor/index.ts';
+import { getLabelColor } from '../../shared/config/index.ts';
+import { showToast, toast, __toastContainer } from '../../shared/ui/toast.ts';
 import {
   getLabel, getLabelPaths, currentLabelFilter, setCurrentLabelFilter,
   createLabel, updateLabel, deleteLabel, addLabelPath, removeLabelPath,
-} from '../../entities/label/index.js';
-import { currentCategoryId } from '../../entities/category/index.js';
-import { getCategoriesInTreeOrder } from '../../entities/folder/index.js';
-import { uid } from '../../entities/card/index.js';
-import { runCard, runCurrent, doCompact, pushLog, startElapsedTicker } from '../../features/ai-run/index.js';
-import { pushCardChange } from '../../features/github-sync/index.js';
-import { exportCurrentMd } from '../../features/export/index.js';
-import { _globalSearchOpen } from '../../features/search/index.js';
+} from '../../entities/label/index.ts';
+import { currentCategoryId } from '../../entities/category/index.ts';
+import { getCategoriesInTreeOrder } from '../../entities/folder/index.ts';
+import { uid } from '../../entities/card/index.ts';
+import { runCard, runCurrent, doCompact, pushLog, startElapsedTicker } from '../../features/ai-run/index.ts';
+import { pushCardChange } from '../../features/github-sync/index.ts';
+import { exportCurrentMd } from '../../features/export/index.ts';
+import { _globalSearchOpen } from '../../features/search/index.ts';
 
 // ===== LABEL MANAGER UI (moved from labels.js) =====
 

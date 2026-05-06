@@ -1,6 +1,6 @@
 // entities/card/index.js
-import { state } from '../../app/state.js';
-import { statusNameToColumn } from '../../shared/config/index.js';
+import { state } from '../../app/state.ts';
+import { statusNameToColumn } from '../../shared/config/index.ts';
 
 export function uid() { return 'c_' + Math.random().toString(36).slice(2, 9); }
 export function catUid() { return 'cat_' + Math.random().toString(36).slice(2, 7); }

@@ -1,7 +1,7 @@
 // features/export/index.js
-import { state, persist } from '../../app/state.js';
-import { sampleCards } from '../../entities/card/index.js';
-import { toast } from '../../shared/ui/toast.js';
+import { state, persist } from '../../app/state.ts';
+import { sampleCards } from '../../entities/card/index.ts';
+import { toast } from '../../shared/ui/toast.ts';
 
 export async function exportCurrentMd() {
   if (!state.detailCardId) return;

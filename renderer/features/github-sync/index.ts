@@ -1,23 +1,23 @@
 // features/github-sync/index.js — GitHub Projects v2 binding
-import { state, persist } from '../../app/state.js';
-import { getPAT, setPAT } from '../../shared/lib/github-pat.js';
+import { state, persist } from '../../app/state.ts';
+import { getPAT, setPAT } from '../../shared/lib/github-pat.ts';
 import {
   getCurrentUser,
   listProjectsForOwner, getProjectMeta,
   listProjectItemsForAssignee, updateProjectItemStatus,
   updateIssueState, createIssue, addProjectV2Item, listUserRepos,
-} from '../../shared/lib/github-api.js';
+} from '../../shared/lib/github-api.ts';
 import {
   findCardByProjectItem,
   buildCardFromProjectItem,
-} from '../../entities/card/index.js';
+} from '../../entities/card/index.ts';
 import {
   currentCategoryId,
   getCategoryProject, setCategoryProject, clearCategoryProject,
-} from '../../entities/category/index.js';
-import { showToast, toast } from '../../shared/ui/toast.js';
-import { escapeHtml } from '../../shared/lib/utils.js';
-import { statusNameToColumn, COLUMN_LABELS } from '../../shared/config/index.js';
+} from '../../entities/category/index.ts';
+import { showToast, toast } from '../../shared/ui/toast.ts';
+import { escapeHtml } from '../../shared/lib/utils.ts';
+import { statusNameToColumn, COLUMN_LABELS } from '../../shared/config/index.ts';
 
 // ===== 동기화 =====
 

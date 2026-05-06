@@ -1,7 +1,7 @@
 // widgets/stats/index.js
-import { state } from '../../app/state.js';
-import { escapeHtml, formatTokens, formatCost, getWeekStart } from '../../shared/lib/utils.js';
-import { getLabelColor } from '../../shared/config/index.js';
+import { state } from '../../app/state.ts';
+import { escapeHtml, formatTokens, formatCost, getWeekStart } from '../../shared/lib/utils.ts';
+import { getLabelColor } from '../../shared/config/index.ts';
 
 export let currentStatsPeriod = 'month';
 export let currentStatsMetric = 'tokens';

@@ -1,13 +1,13 @@
 // widgets/sidebar/index.js
-import { state, persist } from '../../app/state.js';
-import { escapeHtml } from '../../shared/lib/utils.js';
-import { toast } from '../../shared/ui/toast.js';
-import { currentCategoryId, addCategory, deleteCategory, startRenameCategory, addRepoToCategory, removeRepoFromCategory } from '../../entities/category/index.js';
-import { getPAT, setPAT } from '../../shared/lib/github-pat.js';
+import { state, persist } from '../../app/state.ts';
+import { escapeHtml } from '../../shared/lib/utils.ts';
+import { toast } from '../../shared/ui/toast.ts';
+import { currentCategoryId, addCategory, deleteCategory, startRenameCategory, addRepoToCategory, removeRepoFromCategory } from '../../entities/category/index.ts';
+import { getPAT, setPAT } from '../../shared/lib/github-pat.ts';
 import {
   getFolder, getCategoriesByFolder, getAllCategoriesOrdered, getCategoriesInTreeOrder,
   deleteFolder, renameFolder, createFolder, toggleFolderCollapse, promptCreateFolder,
-} from '../../entities/folder/index.js';
+} from '../../entities/folder/index.ts';
 
 // draggedCatId lives here (moved from entities/folder)
 export let draggedCatId = null;

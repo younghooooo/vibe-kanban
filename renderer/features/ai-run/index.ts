@@ -1,10 +1,10 @@
 // features/ai-run/index.js
-import { state, persist } from '../../app/state.js';
-import { nowHMS, autoresizeTextarea, resolveEffectiveAuth } from '../../shared/lib/utils.js';
-import { toast, showToast } from '../../shared/ui/toast.js';
-import { cliStatus, currentAuthMode, openAuthModal } from '../auth/index.js';
-import { MODEL_PRICES, AUTO_COMPACT_TURN_THRESHOLD, AUTO_COMPACT_IDLE_MS } from '../../shared/config/index.js';
-import { getLabelPaths } from '../../entities/label/index.js';
+import { state, persist } from '../../app/state.ts';
+import { nowHMS, autoresizeTextarea, resolveEffectiveAuth } from '../../shared/lib/utils.ts';
+import { toast, showToast } from '../../shared/ui/toast.ts';
+import { cliStatus, currentAuthMode, openAuthModal } from '../auth/index.ts';
+import { MODEL_PRICES, AUTO_COMPACT_TURN_THRESHOLD, AUTO_COMPACT_IDLE_MS } from '../../shared/config/index.ts';
+import { getLabelPaths } from '../../entities/label/index.ts';
 
 export function pushLog(card, label, body) {
   card.log = card.log || [];

@@ -1,6 +1,6 @@
 // features/search/index.js
-import { state } from '../../app/state.js';
-import { escapeHtml } from '../../shared/lib/utils.js';
+import { state } from '../../app/state.ts';
+import { escapeHtml } from '../../shared/lib/utils.ts';
 
 export let _globalSearchOpen = false;
 export let _globalSearchSelectedIdx = -1;
